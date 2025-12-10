@@ -1,5 +1,6 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
+import { RAG_COLLECTIONS } from '../config/rag';
 
 // Step 1: Get breach/CVE from user
 const getTargetStep = createStep({
@@ -131,6 +132,24 @@ Create a comprehensive, PDF-ready markdown report following the complete report 
     ], {
       maxSteps: 5,
     });
+
+    // Store the finalized report in RAG for future retrieval
+    try {
+      await mastra.tools.storeBreachIntelTool.execute({
+        context: {
+          collection: RAG_COLLECTIONS.BREACH_REPORTS,
+          content: result.text,
+          metadata: {
+            identifier: inputData.target,
+            type: inputData.targetType,
+            source: 'workflow:breach-report',
+            dateAdded: new Date().toISOString(),
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Failed to store report in RAG:', err);
+    }
 
     return { finalReport: result.text };
   },

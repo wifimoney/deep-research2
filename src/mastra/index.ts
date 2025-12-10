@@ -12,6 +12,12 @@ import { webResearcherAgent } from './agents/webResearcherAgent';
 import { reportFormatterAgent } from './agents/reportFormatterAgent';
 import { generateReportWorkflow } from '../../template-agents/generateReportWorkflow';
 import { breachReportWorkflow } from './workflows/breachReportWorkflow';
+import { initializeRAGCollections, breachIntelMemory } from './config/rag';
+import {
+  storeBreachIntelTool,
+  retrieveBreachIntelTool,
+  findSimilarThreatsTool,
+} from './tools/ragTools';
 
 // Determine which storage backend to use based on DATABASE_URL
 // If DATABASE_URL starts with 'postgresql://', use PostgresStore
@@ -43,6 +49,14 @@ export const mastra = new Mastra({
     webResearcherAgent,
     reportFormatterAgent,
   },
+  tools: {
+    storeBreachIntelTool,
+    retrieveBreachIntelTool,
+    findSimilarThreatsTool,
+  },
+  vectors: {
+    breachIntelVector: breachIntelMemory.vectorStore,
+  },
   workflows: { generateReportWorkflow, researchWorkflow, breachReportWorkflow },
   observability: {
     default: {
@@ -50,3 +64,8 @@ export const mastra = new Mastra({
     },
   },
 });
+
+// Initialize RAG collections at startup
+initializeRAGCollections()
+  .then(() => console.log('✅ RAG collections initialized'))
+  .catch((err) => console.error('❌ RAG init failed', err));
