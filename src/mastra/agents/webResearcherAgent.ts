@@ -1,5 +1,4 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
 import { webSearchTool } from '../tools/webSearchTool';
 import { httpFetchTool } from '../tools/httpFetchTool';
 import {
@@ -7,6 +6,7 @@ import {
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from '../tools/ragTools';
+import { researchMemory } from '../config/memory';
 
 export const webResearcherAgent = new Agent({
   id: 'web-researcher-agent',
@@ -211,9 +211,6 @@ Your research output will feed directly into intelligence analysis, so accuracy 
     retrieveBreachIntelTool,
     findSimilarThreatsTool,
   },
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-    },
-  }),
+  // Semantic recall enabled: recalls past research context and findings across sessions
+  memory: researchMemory,
 });

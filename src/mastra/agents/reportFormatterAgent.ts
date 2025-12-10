@@ -1,10 +1,10 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
 import {
   storeBreachIntelTool,
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from '../tools/ragTools';
+import { analysisMemory } from '../config/memory';
 
 export const reportFormatterAgent = new Agent({
   id: 'report-formatter-agent',
@@ -757,9 +757,6 @@ Your report will drive security decisions and resource allocation. Make it count
     retrieveBreachIntelTool,
     findSimilarThreatsTool,
   },
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-    },
-  }),
+  // Semantic recall enabled: recalls previous report formats and security context
+  memory: analysisMemory,
 });

@@ -1,8 +1,8 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
 import { evaluateResultTool } from '../src/mastra/tools/evaluateResultTool';
 import { extractLearningsTool } from '../src/mastra/tools/extractLearningsTool';
 import { webSearchTool } from '../src/mastra/tools/webSearchTool';
+import { researchMemory } from '../src/mastra/config/memory';
 
 export const researchAgent = new Agent({
   id: 'research-agent',
@@ -47,9 +47,6 @@ export const researchAgent = new Agent({
     evaluateResultTool,
     extractLearningsTool,
   },
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-    },
-  }),
+  // Semantic recall enabled: recalls past research context and findings across sessions
+  memory: researchMemory,
 });

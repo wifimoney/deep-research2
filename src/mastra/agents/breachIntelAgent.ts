@@ -1,11 +1,11 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
 import { httpFetchTool } from '../tools/httpFetchTool';
 import {
   storeBreachIntelTool,
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from '../tools/ragTools';
+import { analysisMemory } from '../config/memory';
 
 export const breachIntelAgent = new Agent({
   id: 'breach-intel-agent',
@@ -45,9 +45,6 @@ If information is missing, state assumptions clearly.`,
     retrieveBreachIntelTool,
     findSimilarThreatsTool,
   },
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-    },
-  }),
+  // Semantic recall enabled: recalls similar security incidents from past conversations
+  memory: analysisMemory,
 });
