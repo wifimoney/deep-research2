@@ -5,6 +5,7 @@ import {
   workingMemoryExtractLearningsTool,
   getWorkingMemoryContextTool,
 } from '../tools/workingMemoryTools';
+import { researchMemory } from '../config/memory';
 
 /**
  * Research Agent Enhanced with Working Memory
@@ -171,4 +172,6 @@ IMPORTANT: You must ALWAYS include a sessionId parameter when calling any workin
     workingMemoryExtractLearningsTool,
     getWorkingMemoryContextTool,
   },
+  // Conversation history: recalls past research context and findings across sessions
+  memory: researchMemory,
 });

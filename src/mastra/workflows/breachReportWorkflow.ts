@@ -7,8 +7,66 @@
 
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { RAG_COLLECTIONS } from '../config/rag';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { RAG_COLLECTIONS, breachIntelMemory } from '../config/rag';
 import { getWorkingMemory, clearWorkingMemory } from '../memory/workingMemory';
+
+/**
+ * Retry wrapper with exponential backoff for rate-limited API calls
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  delayMs = 2000
+): Promise<T> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastError = err as Error;
+      const statusCode = (err as { statusCode?: number }).statusCode;
+      if (statusCode === 429) {
+        const waitTime = delayMs * (attempt + 1);
+        console.log(`⏳ Rate limited, retrying in ${waitTime}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise((r) => setTimeout(r, waitTime));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Smart truncation that preserves document structure
+ */
+function smartTruncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+
+  // Find last complete section before limit
+  const truncated = text.substring(0, maxLength);
+  const lastSectionBreak = truncated.lastIndexOf('\n===');
+
+  if (lastSectionBreak > maxLength * 0.5) {
+    return truncated.substring(0, lastSectionBreak) + '\n\n[Content truncated due to length]';
+  }
+
+  // Fallback: truncate at last paragraph
+  const lastParagraph = truncated.lastIndexOf('\n\n');
+  if (lastParagraph > maxLength * 0.3) {
+    return truncated.substring(0, lastParagraph) + '\n\n[Content truncated due to length]';
+  }
+
+  // Final fallback: truncate at last sentence
+  const lastSentence = truncated.lastIndexOf('. ');
+  if (lastSentence > maxLength * 0.5) {
+    return truncated.substring(0, lastSentence + 1) + '\n\n[Content truncated due to length]';
+  }
+
+  return truncated + '\n\n[Content truncated due to length]';
+}
 
 // Step 1: Get breach/CVE from user
 const getTargetStep = createStep({
@@ -83,9 +141,10 @@ Session ID: ${sessionId}
 Follow the complete research methodology to gather comprehensive information.
 Track your findings and follow-up questions as you research.`;
 
-    const result = await agent.generate(
-      [{ role: 'user', content: prompt }],
-      { maxSteps: 20 }
+    const result = await withRetry(
+      () => agent.generate([{ role: 'user', content: prompt }], { maxSteps: 20 }),
+      3,
+      2000
     );
 
     // Store findings in working memory
@@ -102,7 +161,7 @@ Track your findings and follow-up questions as you research.`;
       target,
       targetType,
       sessionId,
-      rawFindings: result.text.substring(0, 50000), // Truncate to ~50KB to prevent memory issues
+      rawFindings: smartTruncate(result.text, 50000),
     };
   },
 });
@@ -168,7 +227,7 @@ Structure your response clearly with distinct sections.`;
       target,
       targetType,
       sessionId,
-      structuredIntel: result.text.substring(0, 50000), // Truncate to ~50KB to prevent memory issues
+      structuredIntel: smartTruncate(result.text, 50000),
     };
   },
 });
@@ -224,12 +283,10 @@ Include a section reflecting the research journey and accumulated insights.`;
 
     // Store the finalized report in RAG for future retrieval
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tools = (mastra as any).tools;
-      if (tools?.storeBreachIntelTool) {
-        await tools.storeBreachIntelTool.execute({
-          context: {
-            collection: RAG_COLLECTIONS.BREACH_REPORTS,
+      await breachIntelMemory.add({
+        collection: RAG_COLLECTIONS.BREACH_REPORTS,
+        documents: [
+          {
             content: result.text,
             metadata: {
               identifier: target,
@@ -237,14 +294,25 @@ Include a section reflecting the research journey and accumulated insights.`;
               source: 'workflow:breach-report',
               dateAdded: new Date().toISOString(),
               sessionId,
-              researchStats: stats,
             },
           },
-        });
-        console.log(`✓ Report stored in RAG`);
-      }
+        ],
+      });
+      console.log(`✓ Report stored in RAG`);
     } catch (err) {
       console.error('Failed to store report in RAG:', err);
+    }
+
+    // Save report to filesystem
+    try {
+      const reportsDir = join(process.cwd(), 'reports');
+      await mkdir(reportsDir, { recursive: true });
+      const filename = `${target.replace(/[^a-zA-Z0-9-]/g, '-')}-${Date.now()}.md`;
+      const filepath = join(reportsDir, filename);
+      await writeFile(filepath, result.text);
+      console.log(`📄 Report saved to: ${filepath}`);
+    } catch (err) {
+      console.error('Failed to save report to filesystem:', err);
     }
 
     return {

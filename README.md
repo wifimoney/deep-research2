@@ -2,6 +2,26 @@
 
 This project implements an advanced AI deep research assistant using Mastra's workflows and agent capabilities. It creates an interactive, human-in-the-loop research system that allows users to explore topics, evaluate results, and generate comprehensive reports.
 
+## Quick Start
+
+```bash
+# 1. Install
+npm install
+
+# 2. Set environment variables
+cp .env.example .env
+# Add your API keys
+
+# 3. Run example
+npm run demo
+
+# This will:
+# - Prompt for a breach name (try "SolarWinds")
+# - Research using web tools
+# - Generate a structured intel report
+# - Save to reports/solarwinds-[timestamp].md
+```
+
 ## Implementation Approach
 
 The research assistant is built on Mastra's workflows architecture for better orchestration and human interaction:
