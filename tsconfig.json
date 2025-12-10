@@ -10,5 +10,5 @@
     "noEmit": true,
     "outDir": "dist"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "template-agents/evaluationAgent.ts", "template-agents/learningExtractionAgent.ts", "template-agents/reportAgent.ts", "template-agents/researchAgent.ts", "template-agents/webSummarizationAgent.ts", "template-agents/generateReportWorkflow.ts", "template-agents/researchWorkflow.ts"]
 }

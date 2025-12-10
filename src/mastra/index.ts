@@ -1,14 +1,17 @@
 import { Mastra } from '@mastra/core/mastra';
 import { LibSQLStore } from '@mastra/libsql';
 import { PostgresStore } from '@mastra/pg';
-import { researchWorkflow } from './workflows/researchWorkflow';
-import { learningExtractionAgent } from './agents/learningExtractionAgent';
-import { evaluationAgent } from './agents/evaluationAgent';
-import { reportAgent } from './agents/reportAgent';
-import { researchAgent } from './agents/researchAgent';
-import { webSummarizationAgent } from './agents/webSummarizationAgent';
+import { researchWorkflow } from '../../template-agents/researchWorkflow';
+import { learningExtractionAgent } from '../../template-agents/learningExtractionAgent';
+import { evaluationAgent } from '../../template-agents/evaluationAgent';
+import { reportAgent } from '../../template-agents/reportAgent';
+import { researchAgent } from '../../template-agents/researchAgent';
+import { webSummarizationAgent } from '../../template-agents/webSummarizationAgent';
 import { breachIntelAgent } from './agents/breachIntelAgent';
-import { generateReportWorkflow } from './workflows/generateReportWorkflow';
+import { webResearcherAgent } from './agents/webResearcherAgent';
+import { reportFormatterAgent } from './agents/reportFormatterAgent';
+import { generateReportWorkflow } from '../../template-agents/generateReportWorkflow';
+import { breachReportWorkflow } from './workflows/breachReportWorkflow';
 
 // Determine which storage backend to use based on DATABASE_URL
 // If DATABASE_URL starts with 'postgresql://', use PostgresStore
@@ -37,8 +40,10 @@ export const mastra = new Mastra({
     learningExtractionAgent,
     webSummarizationAgent,
     breachIntelAgent,
+    webResearcherAgent,
+    reportFormatterAgent,
   },
-  workflows: { generateReportWorkflow, researchWorkflow },
+  workflows: { generateReportWorkflow, researchWorkflow, breachReportWorkflow },
   observability: {
     default: {
       enabled: false, // Disabled to prevent "Invalid string length" errors with large telemetry payloads

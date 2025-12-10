@@ -66,3 +66,37 @@ Note: You can also use `EXA_API_KEY` for backwards compatibility, but `EXASEARCH
 - `@ai-sdk/openai`: OpenAI models integration
 - `exa-js`: Exa API client for web search
 - `zod`: Schema definition and validation for workflows
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: "EXA_API_KEY not found"**
+
+- Ensure you've created a `.env` file in the project root
+- Copy from `.env.example` and add your actual API key
+- Restart your development server after adding the key
+
+**Issue: "Model not found" errors**
+
+- Check that your MODEL in `.env` matches available models
+- Valid formats: `openai/gpt-4o-mini`, `anthropic/claude-sonnet-4-20250514`
+- See `.env.example` for all supported models
+
+**Issue: Research takes too long**
+
+- Reduce `SEARCH_RESULTS_PER_QUERY` in `.env` (default: 2)
+- Reduce `MAX_RESEARCH_STEPS` (default: 15)
+- Use faster models for summarization
+
+**Issue: Token limit exceeded**
+
+- Content summarization should prevent this, but if it occurs:
+- Reduce `MAX_SEARCH_TOKENS` in `.env`
+- Use more aggressive summarization models
+
+**Issue: Database connection errors**
+
+- By default, the app uses file-based storage (`file:./storage.db`) which requires no database server
+- If you see PostgreSQL connection errors, ensure `DATABASE_URL` in `.env` is set to `file:./storage.db` or a valid PostgreSQL connection string
+- The app automatically detects the URL scheme and uses the appropriate storage backend

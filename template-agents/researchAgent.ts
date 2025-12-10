@@ -1,8 +1,8 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
-import { evaluateResultTool } from '../tools/evaluateResultTool';
-import { extractLearningsTool } from '../tools/extractLearningsTool';
-import { webSearchTool } from '../tools/webSearchTool';
+import { evaluateResultTool } from '../src/mastra/tools/evaluateResultTool';
+import { extractLearningsTool } from '../src/mastra/tools/extractLearningsTool';
+import { webSearchTool } from '../src/mastra/tools/webSearchTool';
 
 export const researchAgent = new Agent({
   id: 'research-agent',
