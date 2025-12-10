@@ -13,15 +13,16 @@ import { generateReportWorkflow } from './workflows/generateReportWorkflow';
 // Determine which storage backend to use based on DATABASE_URL
 // If DATABASE_URL starts with 'postgresql://', use PostgresStore
 // Otherwise, use LibSQLStore (supports file:, libsql:, etc.)
-const databaseUrl = process.env.DATABASE_URL || 'file:./storage.db';
+const databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./storage.db';
 
 let storage: LibSQLStore | PostgresStore;
 
-if (databaseUrl.startsWith('postgresql://')) {
+if (databaseUrl && databaseUrl.startsWith('postgresql://')) {
   storage = new PostgresStore({
     connectionString: databaseUrl,
   });
 } else {
+  // Use LibSQLStore for file-based or LibSQL URLs
   storage = new LibSQLStore({
     url: databaseUrl,
   });
