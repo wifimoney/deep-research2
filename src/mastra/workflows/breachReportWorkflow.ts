@@ -102,7 +102,7 @@ Track your findings and follow-up questions as you research.`;
       target,
       targetType,
       sessionId,
-      rawFindings: result.text,
+      rawFindings: result.text.substring(0, 50000), // Truncate to ~50KB to prevent memory issues
     };
   },
 });
@@ -168,7 +168,7 @@ Structure your response clearly with distinct sections.`;
       target,
       targetType,
       sessionId,
-      structuredIntel: result.text,
+      structuredIntel: result.text.substring(0, 50000), // Truncate to ~50KB to prevent memory issues
     };
   },
 });

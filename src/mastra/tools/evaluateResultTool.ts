@@ -47,7 +47,7 @@ export const evaluateResultTool = createTool({
           },
         ],
         {
-          experimental_output: z.object({
+          output: z.object({
             isRelevant: z.boolean(),
             reason: z.string(),
           }),

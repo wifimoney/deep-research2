@@ -137,14 +137,14 @@ export const workingMemoryEvaluateTool = createTool({
             },
           ],
           {
-            experimental_output: z.object({
+            output: z.object({
               isRelevant: z.boolean(),
               reason: z.string(),
             }),
           },
         );
 
-        evaluation = response.object;
+        evaluation = response.object ?? { isRelevant: false, reason: 'No response' };
       } catch (err) {
         evaluation = {
           isRelevant: false,
@@ -205,13 +205,13 @@ export const workingMemoryExtractLearningsTool = createTool({
             },
           ],
           {
-            experimental_output: z.object({
+            output: z.object({
               learning: z.string(),
               followUpQuestions: z.array(z.string()).max(3),
             }),
           },
         );
-        learningPayload = response.object;
+        learningPayload = response.object ?? { learning: '', followUpQuestions: [] };
       } catch (err) {
         learningPayload = {
           learning: 'Extraction failed',

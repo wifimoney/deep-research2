@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
+import { lightweightMemory } from '../src/mastra/config/memory';
 
 export const evaluationAgent = new Agent({
   id: 'evaluation-agent',
@@ -27,9 +27,5 @@ export const evaluationAgent = new Agent({
   - reason: brief explanation of your decision
   `,
   model: process.env.MODEL || 'openai/gpt-4.1',
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-    },
-  }),
+  memory: lightweightMemory,
 });

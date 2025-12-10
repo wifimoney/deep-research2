@@ -15,26 +15,28 @@ import { workingMemoryResearchAgent } from './agents/workingMemoryResearchAgent'
 import { generateReportWorkflow } from '../../template-agents/generateReportWorkflow';
 import { breachReportWorkflow } from './workflows/breachReportWorkflow';
 import { initializeRAGCollections, breachIntelMemory } from './config/rag';
-import {
-  storeBreachIntelTool,
-  retrieveBreachIntelTool,
-  findSimilarThreatsTool,
-} from './tools/ragTools';
-import {
-  getWorkingMemoryContextTool,
-  workingMemoryEvaluateTool,
-  workingMemoryExtractLearningsTool,
-  workingMemoryWebSearchTool,
-} from './tools/workingMemoryTools';
 
 // Determine which storage backend to use based on DATABASE_URL
 // If DATABASE_URL starts with 'postgresql://', use PostgresStore
 // Otherwise, use LibSQLStore (supports file:, libsql:, etc.)
-const databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./storage.db';
+let databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./storage.db';
+
+// Fix malformed DATABASE_URL if it contains the key as part of the value
+if (databaseUrl.startsWith('DATABASE_URL=')) {
+  databaseUrl = databaseUrl.replace('DATABASE_URL=', '');
+}
+
+const isPostgres = databaseUrl.startsWith('postgresql://');
+
+// Only add SSL for remote connections (not localhost/127.0.0.1)
+const isLocalhost = databaseUrl.includes('@localhost') || databaseUrl.includes('@127.0.0.1');
+if (isPostgres && !isLocalhost && !databaseUrl.includes('sslmode=')) {
+  databaseUrl += databaseUrl.includes('?') ? '&sslmode=require' : '?sslmode=require';
+}
 
 let storage: LibSQLStore | PostgresStore;
 
-if (databaseUrl && databaseUrl.startsWith('postgresql://')) {
+if (isPostgres) {
   storage = new PostgresStore({
     connectionString: databaseUrl,
   });
@@ -59,15 +61,6 @@ export const mastra = new Mastra({
     reportFormatterAgent,
     workingMemoryResearchAgent,
   },
-  tools: {
-    storeBreachIntelTool,
-    retrieveBreachIntelTool,
-    findSimilarThreatsTool,
-    workingMemoryWebSearchTool,
-    workingMemoryEvaluateTool,
-    workingMemoryExtractLearningsTool,
-    getWorkingMemoryContextTool,
-  },
   vectors: {
     breachIntelVector: breachIntelMemory.vectorStore,
   },
@@ -80,6 +73,12 @@ export const mastra = new Mastra({
     default: {
       enabled: false, // Disabled to prevent "Invalid string length" errors with large telemetry payloads
     },
+  },
+  // Explicitly disable deprecated OTEL tracing to prevent memory issues
+  // The old telemetry system captures full span data including agent messages,
+  // which causes "Invalid string length" errors and heap exhaustion
+  telemetry: {
+    enabled: false,
   },
 });
 

@@ -26,29 +26,61 @@ import { PostgresStore, PgVector } from '@mastra/pg';
 // Determine which storage backend to use based on DATABASE_URL
 // If DATABASE_URL starts with 'postgresql://', use PostgresStore + PgVector
 // Otherwise, use LibSQLStore + LibSQLVector (supports file:, libsql:, etc.)
-const databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./memory-storage.db';
+let databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./memory-storage.db';
+
+// Fix malformed DATABASE_URL if it contains the key as part of the value
+if (databaseUrl.startsWith('DATABASE_URL=')) {
+  databaseUrl = databaseUrl.replace('DATABASE_URL=', '');
+}
+
 const isPostgres = databaseUrl.startsWith('postgresql://');
+
+console.log(`[Memory] Using ${isPostgres ? 'PostgreSQL' : 'LibSQL'} backend`);
+console.log(`[Memory] Database URL: ${databaseUrl.substring(0, 50)}...`);
 
 // Shared storage and vector instances for all memory
 let memoryStorage: LibSQLStore | PostgresStore;
 let memoryVector: LibSQLVector | PgVector;
 
-if (isPostgres) {
-  // PostgreSQL for production deployments
-  memoryStorage = new PostgresStore({
-    connectionString: databaseUrl,
-  });
-  memoryVector = new PgVector({
-    connectionString: databaseUrl,
-  });
-} else {
-  // LibSQL for local development
-  memoryStorage = new LibSQLStore({
-    url: databaseUrl,
-  });
-  memoryVector = new LibSQLVector({
-    connectionUrl: databaseUrl,
-  });
+try {
+  if (isPostgres) {
+    // PostgreSQL for production deployments
+    // Only add SSL for remote connections (not localhost/127.0.0.1)
+    let connectionString = databaseUrl;
+    const isLocalhost = databaseUrl.includes('@localhost') || databaseUrl.includes('@127.0.0.1');
+    if (!isLocalhost && !connectionString.includes('sslmode=')) {
+      connectionString += connectionString.includes('?') ? '&sslmode=require' : '?sslmode=require';
+    }
+    
+    console.log('[Memory] Creating PostgresStore...');
+    memoryStorage = new PostgresStore({
+      connectionString,
+    });
+    console.log('[Memory] PostgresStore created:', !!memoryStorage);
+    
+    console.log('[Memory] Creating PgVector...');
+    memoryVector = new PgVector({
+      connectionString,
+    });
+    console.log('[Memory] PgVector created:', !!memoryVector);
+  } else {
+    // LibSQL for local development
+    console.log('[Memory] Creating LibSQLStore...');
+    memoryStorage = new LibSQLStore({
+      url: databaseUrl,
+    });
+    console.log('[Memory] LibSQLStore created:', !!memoryStorage);
+    
+    console.log('[Memory] Creating LibSQLVector...');
+    memoryVector = new LibSQLVector({
+      connectionUrl: databaseUrl,
+    });
+    console.log('[Memory] LibSQLVector created:', !!memoryVector);
+  }
+  console.log('[Memory] Initialization complete');
+} catch (error) {
+  console.error('[Memory] Failed to initialize storage:', error);
+  throw error;
 }
 
 /**
@@ -110,17 +142,23 @@ export function createMemory(config: MemoryConfig = {}): Memory {
   const { lastMessages = 20, semanticRecall = true } = config;
 
   // Build semantic recall options
-  let semanticRecallOptions: false | SemanticRecallConfig;
+  // Ensure all required properties are present (topK and messageRange must be numbers, not undefined)
+  let semanticRecallOptions: false | { topK: number; messageRange: number; scope?: 'thread' | 'resource' };
 
   if (semanticRecall === false) {
     semanticRecallOptions = false;
   } else if (semanticRecall === true) {
-    semanticRecallOptions = DEFAULT_SEMANTIC_RECALL;
-  } else {
-    // Custom config - merge with defaults
     semanticRecallOptions = {
-      ...DEFAULT_SEMANTIC_RECALL,
-      ...semanticRecall,
+      topK: DEFAULT_SEMANTIC_RECALL.topK!,
+      messageRange: DEFAULT_SEMANTIC_RECALL.messageRange!,
+      scope: DEFAULT_SEMANTIC_RECALL.scope,
+    };
+  } else {
+    // Custom config - merge with defaults, ensuring required properties are numbers
+    semanticRecallOptions = {
+      topK: semanticRecall.topK ?? DEFAULT_SEMANTIC_RECALL.topK!,
+      messageRange: semanticRecall.messageRange ?? DEFAULT_SEMANTIC_RECALL.messageRange!,
+      scope: semanticRecall.scope ?? DEFAULT_SEMANTIC_RECALL.scope,
     };
   }
 
@@ -132,6 +170,9 @@ export function createMemory(config: MemoryConfig = {}): Memory {
     options: {
       lastMessages,
       semanticRecall: semanticRecallOptions,
+      workingMemory: {
+        enabled: true,
+      },
     },
   });
 }
@@ -154,10 +195,10 @@ export const standardMemory = createMemory({
  * Best for: Research agents that need to recall information across sessions
  */
 export const researchMemory = createMemory({
-  lastMessages: 30,
+  lastMessages: 15, // Reduced from 30 to prevent memory issues with large research tasks
   semanticRecall: {
-    topK: 5,
-    messageRange: 3,
+    topK: 3, // Reduced from 5
+    messageRange: 2, // Reduced from 3
     scope: 'resource',
   },
 });
@@ -189,3 +230,214 @@ export const lightweightMemory = createMemory({
  * Export shared instances for direct use
  */
 export { memoryStorage, memoryVector };
+
+// ============================================================================
+// CHAPTER 7 WRAPPER FUNCTIONS
+// ============================================================================
+// These functions provide a Chapter 7-style API for direct memory operations.
+// They wrap Mastra's storage layer for compatibility with the book's examples.
+
+/**
+ * Message type for storage operations
+ */
+export type StoredMessage = {
+  id: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  createdAt: Date;
+};
+
+/**
+ * Add a message to a conversation thread
+ * Chapter 7 equivalent: WorkingMemory.addMessage()
+ *
+ * @example
+ * await addMessage('thread-123', 'user', 'What is Log4Shell?');
+ * await addMessage('thread-123', 'assistant', 'Log4Shell is...');
+ */
+export async function addMessage(
+  threadId: string,
+  role: StoredMessage['role'],
+  content: string
+): Promise<string> {
+  const id = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+  // Use Memory instance for proper API compatibility
+  const memory = new Memory({
+    storage: memoryStorage,
+    vector: memoryVector,
+    embedder: 'openai/text-embedding-3-small',
+  });
+
+  // Save message using Memory's internal storage API
+  await memoryStorage.saveMessages({
+    messages: [
+      {
+        id,
+        threadId,
+        role,
+        content,
+        createdAt: new Date(),
+        type: 'text',
+      },
+    ],
+  });
+
+  return id;
+}
+
+/**
+ * Get recent messages from a conversation thread
+ * Chapter 7 equivalent: WorkingMemory.getRecentMessages()
+ *
+ * @example
+ * const messages = await getRecentMessages('thread-123', 10);
+ */
+export async function getRecentMessages(
+  threadId: string,
+  limit: number = 10
+): Promise<StoredMessage[]> {
+  // Use Memory instance for proper API compatibility
+  const memory = new Memory({
+    storage: memoryStorage,
+    vector: memoryVector,
+    embedder: 'openai/text-embedding-3-small',
+  });
+
+  // Use Memory.query() which has the correct API
+  const { uiMessages } = await memory.query({
+    threadId,
+    selectBy: {
+      last: limit,
+    },
+  });
+
+  return uiMessages.map((msg) => ({
+    id: msg.id,
+    role: msg.role as StoredMessage['role'],
+    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+    createdAt: msg.createdAt || new Date(),
+  }));
+}
+
+/**
+ * Get or create a conversation thread
+ *
+ * @example
+ * const thread = await getOrCreateThread('thread-123', 'user-456');
+ */
+export async function getOrCreateThread(
+  threadId: string,
+  resourceId: string,
+  title?: string
+): Promise<{ id: string; resourceId: string; title?: string }> {
+  // Try to get existing thread
+  const existing = await memoryStorage.getThreadById({ threadId });
+
+  if (existing) {
+    return {
+      id: existing.id,
+      resourceId: existing.resourceId,
+      title: existing.title,
+    };
+  }
+
+  // Create new thread
+  const thread = await memoryStorage.saveThread({
+    thread: {
+      id: threadId,
+      resourceId,
+      title,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metadata: {},
+    },
+  });
+
+  return {
+    id: thread.id,
+    resourceId: thread.resourceId,
+    title: thread.title,
+  };
+}
+
+/**
+ * Compile context for an agent prompt
+ * Chapter 7 equivalent: WorkingMemory.compileContext()
+ *
+ * Combines recent messages with semantic search results.
+ * Note: Semantic search is handled automatically by Mastra's Memory class
+ * when using agent.generate(). This function is for manual context compilation.
+ *
+ * @example
+ * const context = await compileContext('thread-123', 'What mitigations exist?');
+ */
+export async function compileContext(
+  threadId: string,
+  query: string,
+  options: {
+    recentLimit?: number;
+  } = {}
+): Promise<{
+  threadId: string;
+  query: string;
+  recentMessages: StoredMessage[];
+  contextString: string;
+}> {
+  const { recentLimit = 10 } = options;
+
+  // Get recent messages
+  const recentMessages = await getRecentMessages(threadId, recentLimit);
+
+  // Build context string for prompt injection
+  const contextString = recentMessages
+    .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
+    .join('\n\n');
+
+  return {
+    threadId,
+    query,
+    recentMessages,
+    contextString,
+  };
+}
+
+/**
+ * Get all threads for a user/resource
+ *
+ * @example
+ * const threads = await getThreadsByResource('user-123');
+ */
+export async function getThreadsByResource(
+  resourceId: string,
+  limit: number = 50
+): Promise<Array<{ id: string; title?: string; createdAt: Date }>> {
+  // Use Memory instance for proper API compatibility
+  const memory = new Memory({
+    storage: memoryStorage,
+    vector: memoryVector,
+    embedder: 'openai/text-embedding-3-small',
+  });
+
+  // Use paginated version if limit is needed, otherwise use non-paginated
+  let threads;
+  if (limit <= 50) {
+    // For small limits, use non-paginated version and slice
+    threads = await memoryStorage.getThreadsByResourceId({ resourceId });
+    threads = threads.slice(0, limit);
+  } else {
+    // For larger limits, use paginated version
+    const result = await memory.getThreadsByResourceIdPaginated({
+      resourceId,
+      page: 0,
+      perPage: limit,
+    });
+    threads = result.threads;
+  }
+
+  return threads.map((t) => ({
+    id: t.id,
+    title: t.title,
+    createdAt: t.createdAt,
+  }));
+}

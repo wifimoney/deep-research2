@@ -55,7 +55,6 @@ export const retrieveBreachIntelTool = createTool({
       collections = Object.values(RAG_COLLECTIONS),
       topK,
       minScore,
-      filter,
     } = context;
 
     const allResults = [];
@@ -65,7 +64,6 @@ export const retrieveBreachIntelTool = createTool({
         query,
         topK,
         minScore,
-        filter,
       });
 
       allResults.push(

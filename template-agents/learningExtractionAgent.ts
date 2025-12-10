@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
+import { lightweightMemory } from '../src/mastra/config/memory';
 
 export const learningExtractionAgent = new Agent({
   id: 'learning-extraction-agent',
@@ -19,9 +19,5 @@ export const learningExtractionAgent = new Agent({
 
   3. Generate 1 relevant follow-up question that would deepen the research`,
   model: process.env.MODEL || 'openai/gpt-4.1',
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-    },
-  }),
+  memory: lightweightMemory,
 });

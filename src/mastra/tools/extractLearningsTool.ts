@@ -37,7 +37,7 @@ export const extractLearningsTool = createTool({
           },
         ],
         {
-          experimental_output: z.object({
+          output: z.object({
             learning: z.string(),
             followUpQuestions: z.array(z.string()).max(1),
           }),

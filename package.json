@@ -17,12 +17,14 @@
     "node": ">=22.13.0"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^1.3.24",
     "@mastra/core": "latest",
     "@mastra/libsql": "^0.16.4",
     "@mastra/loggers": "latest",
     "@mastra/memory": "^0.15.13",
     "@mastra/pg": "^0.17.10",
     "ai": "^4.3.19",
+    "dotenv": "^17.2.3",
     "exa-js": "^1.8.27",
     "zod": "^3.25.76"
   },
