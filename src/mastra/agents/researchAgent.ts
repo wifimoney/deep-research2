@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { Memory } from '@mastra/memory';
 import { evaluateResultTool } from '../tools/evaluateResultTool';
 import { extractLearningsTool } from '../tools/extractLearningsTool';
 import { webSearchTool } from '../tools/webSearchTool';
@@ -46,4 +47,9 @@ export const researchAgent = new Agent({
     evaluateResultTool,
     extractLearningsTool,
   },
+  memory: new Memory({
+    options: {
+      lastMessages: 20,
+    },
+  }),
 });

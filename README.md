@@ -54,9 +54,11 @@ Follow the interactive prompts:
 Create a `.env` file with:
 
 ```
-OPENAI_API_KEY=""
-EXA_API_KEY="your-exa-api-key"
+OPENAI_API_KEY="your-openai-api-key"
+EXASEARCH_API_KEY="your-exa-api-key"
 ```
+
+Note: You can also use `EXA_API_KEY` for backwards compatibility, but `EXASEARCH_API_KEY` is the preferred variable name.
 
 ## Required Dependencies
 

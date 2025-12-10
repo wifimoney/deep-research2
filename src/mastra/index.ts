@@ -1,29 +1,46 @@
 import { Mastra } from '@mastra/core/mastra';
 import { LibSQLStore } from '@mastra/libsql';
+import { PostgresStore } from '@mastra/pg';
 import { researchWorkflow } from './workflows/researchWorkflow';
 import { learningExtractionAgent } from './agents/learningExtractionAgent';
 import { evaluationAgent } from './agents/evaluationAgent';
 import { reportAgent } from './agents/reportAgent';
 import { researchAgent } from './agents/researchAgent';
 import { webSummarizationAgent } from './agents/webSummarizationAgent';
+import { breachIntelAgent } from './agents/breachIntelAgent';
 import { generateReportWorkflow } from './workflows/generateReportWorkflow';
 
+// Determine which storage backend to use based on DATABASE_URL
+// If DATABASE_URL starts with 'postgresql://', use PostgresStore
+// Otherwise, use LibSQLStore (supports file:, libsql:, etc.)
+const databaseUrl = process.env.DATABASE_URL || 'file:./storage.db';
+
+let storage: LibSQLStore | PostgresStore;
+
+if (databaseUrl.startsWith('postgresql://')) {
+  storage = new PostgresStore({
+    connectionString: databaseUrl,
+  });
+} else {
+  storage = new LibSQLStore({
+    url: databaseUrl,
+  });
+}
+
 export const mastra = new Mastra({
-  storage: new LibSQLStore({
-    id: 'mastra-storage',
-    url: 'file:../mastra.db',
-  }),
+  storage,
   agents: {
     researchAgent,
     reportAgent,
     evaluationAgent,
     learningExtractionAgent,
     webSummarizationAgent,
+    breachIntelAgent,
   },
   workflows: { generateReportWorkflow, researchWorkflow },
   observability: {
     default: {
-      enabled: true,
+      enabled: false, // Disabled to prevent "Invalid string length" errors with large telemetry payloads
     },
   },
 });
