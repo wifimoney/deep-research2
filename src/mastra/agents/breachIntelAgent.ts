@@ -1,6 +1,11 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { httpFetchTool } from '../tools/httpFetchTool';
+import {
+  storeBreachIntelTool,
+  retrieveBreachIntelTool,
+  findSimilarThreatsTool,
+} from '../tools/ragTools';
 
 export const breachIntelAgent = new Agent({
   id: 'breach-intel-agent',
@@ -8,6 +13,8 @@ export const breachIntelAgent = new Agent({
   instructions: `You are BreachIntelAgent — an autonomous security research agent.
 
 Your job is to analyze recent hacks, breaches, and CVEs.
+
+Before analysis, query the RAG knowledge base for similar incidents and incorporate those findings into your response.
 
 For every incident you receive, you must output:
 
@@ -34,6 +41,9 @@ If information is missing, state assumptions clearly.`,
   },
   tools: {
     httpFetchTool,
+    storeBreachIntelTool,
+    retrieveBreachIntelTool,
+    findSimilarThreatsTool,
   },
   memory: new Memory({
     options: {

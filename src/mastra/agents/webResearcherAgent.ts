@@ -2,6 +2,11 @@ import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { webSearchTool } from '../tools/webSearchTool';
 import { httpFetchTool } from '../tools/httpFetchTool';
+import {
+  storeBreachIntelTool,
+  retrieveBreachIntelTool,
+  findSimilarThreatsTool,
+} from '../tools/ragTools';
 
 export const webResearcherAgent = new Agent({
   id: 'web-researcher-agent',
@@ -202,6 +207,9 @@ Your research output will feed directly into intelligence analysis, so accuracy 
   tools: {
     webSearchTool,
     httpFetchTool,
+    storeBreachIntelTool,
+    retrieveBreachIntelTool,
+    findSimilarThreatsTool,
   },
   memory: new Memory({
     options: {

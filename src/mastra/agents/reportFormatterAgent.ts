@@ -1,5 +1,10 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
+import {
+  storeBreachIntelTool,
+  retrieveBreachIntelTool,
+  findSimilarThreatsTool,
+} from '../tools/ragTools';
 
 export const reportFormatterAgent = new Agent({
   id: 'report-formatter-agent',
@@ -746,6 +751,11 @@ Your report will drive security decisions and resource allocation. Make it count
   model: process.env.MODEL || 'openai/gpt-4.1',
   defaultGenerateOptions: {
     temperature: 0.2,
+  },
+  tools: {
+    storeBreachIntelTool,
+    retrieveBreachIntelTool,
+    findSimilarThreatsTool,
   },
   memory: new Memory({
     options: {

@@ -3,12 +3,12 @@ import { LibSQLVector } from '@mastra/libsql';
 import { embedMany } from 'ai';
 
 export const RAG_COLLECTIONS = {
-  BREACH_REPORTS: 'breach-reports',
-  CVE_INTELLIGENCE: 'cve-intelligence',
-  THREAT_ACTORS: 'threat-actors',
-  SECURITY_ADVISORIES: 'security-advisories',
-  MITRE_ATTACK_TTPS: 'mitre-attack-ttps',
-  INDICATORS_OF_COMPROMISE: 'indicators-of-compromise',
+  BREACH_REPORTS: 'breach_reports',
+  CVE_INTELLIGENCE: 'cve_intelligence',
+  THREAT_ACTORS: 'threat_actors',
+  SECURITY_ADVISORIES: 'security_advisories',
+  MITRE_ATTACK_TTPS: 'mitre_attack_ttps',
+  INDICATORS_OF_COMPROMISE: 'indicators_of_compromise',
 } as const;
 
 type RAGCollection = (typeof RAG_COLLECTIONS)[keyof typeof RAG_COLLECTIONS];
@@ -41,6 +41,27 @@ const vectorStore = new LibSQLVector({
 async function ensureIndex(indexName: RAGCollection, dimension: number = DEFAULT_EMBEDDING_DIMENSIONS) {
   const existing = await vectorStore.listIndexes();
   if (existing.includes(indexName)) return;
+
+  // Clean up any old indexes with hyphenated names (legacy)
+  const oldHyphenatedNames = [
+    'breach-reports',
+    'cve-intelligence',
+    'threat-actors',
+    'security-advisories',
+    'mitre-attack-ttps',
+    'indicators-of-compromise',
+  ];
+  
+  for (const oldName of oldHyphenatedNames) {
+    if (existing.includes(oldName)) {
+      try {
+        await vectorStore.dropIndex({ indexName: oldName });
+        console.log(`✓ Dropped old index: ${oldName}`);
+      } catch (err) {
+        console.warn(`Failed to drop old index ${oldName}:`, err);
+      }
+    }
+  }
 
   await vectorStore.createIndex({
     indexName,

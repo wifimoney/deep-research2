@@ -8,8 +8,10 @@ import { reportAgent } from '../../template-agents/reportAgent';
 import { researchAgent } from '../../template-agents/researchAgent';
 import { webSummarizationAgent } from '../../template-agents/webSummarizationAgent';
 import { breachIntelAgent } from './agents/breachIntelAgent';
+import { ragEnhancedBreachIntelAgent } from './agents/ragEnhancedBreachIntelAgent';
 import { webResearcherAgent } from './agents/webResearcherAgent';
 import { reportFormatterAgent } from './agents/reportFormatterAgent';
+import { workingMemoryResearchAgent } from './agents/workingMemoryResearchAgent';
 import { generateReportWorkflow } from '../../template-agents/generateReportWorkflow';
 import { breachReportWorkflow } from './workflows/breachReportWorkflow';
 import { initializeRAGCollections, breachIntelMemory } from './config/rag';
@@ -18,6 +20,12 @@ import {
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from './tools/ragTools';
+import {
+  getWorkingMemoryContextTool,
+  workingMemoryEvaluateTool,
+  workingMemoryExtractLearningsTool,
+  workingMemoryWebSearchTool,
+} from './tools/workingMemoryTools';
 
 // Determine which storage backend to use based on DATABASE_URL
 // If DATABASE_URL starts with 'postgresql://', use PostgresStore
@@ -46,18 +54,28 @@ export const mastra = new Mastra({
     learningExtractionAgent,
     webSummarizationAgent,
     breachIntelAgent,
+    ragEnhancedBreachIntelAgent,
     webResearcherAgent,
     reportFormatterAgent,
+    workingMemoryResearchAgent,
   },
   tools: {
     storeBreachIntelTool,
     retrieveBreachIntelTool,
     findSimilarThreatsTool,
+    workingMemoryWebSearchTool,
+    workingMemoryEvaluateTool,
+    workingMemoryExtractLearningsTool,
+    getWorkingMemoryContextTool,
   },
   vectors: {
     breachIntelVector: breachIntelMemory.vectorStore,
   },
-  workflows: { generateReportWorkflow, researchWorkflow, breachReportWorkflow },
+  workflows: {
+    generateReportWorkflow,
+    researchWorkflow,
+    breachReportWorkflow,
+  },
   observability: {
     default: {
       enabled: false, // Disabled to prevent "Invalid string length" errors with large telemetry payloads
