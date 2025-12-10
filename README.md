@@ -1,122 +1,136 @@
-# Deep Research Assistant with Mastra
+# Breach Intelligence Research Assistant
 
-This project implements an advanced AI deep research assistant using Mastra's workflows and agent capabilities. It creates an interactive, human-in-the-loop research system that allows users to explore topics, evaluate results, and generate comprehensive reports.
+AI-powered security research system using Mastra. Generates professional, PDF-ready breach intelligence reports with RAG-augmented analysis.
+
+## Features
+
+- **RAG-Enhanced Analysis** - Queries historical breach data for context
+- **Working Memory** - Tracks research journey across workflow steps
+- **Dual Storage** - PostgreSQL (production) or LibSQL (local)
+- **Vector Search** - Semantic similarity via PgVector/LibSQLVector
+- **PDF-Ready Reports** - 5-section security intelligence format
+- **Web Research** - Automated CVE/breach lookup via Exa API
 
 ## Quick Start
 
 ```bash
-# 1. Install
-npm install
+# Install
+pnpm install
 
-# 2. Set environment variables
+# Configure
 cp .env.example .env
-# Add your API keys
+# Add: OPENAI_API_KEY, EXASEARCH_API_KEY
 
-# 3. Run example
-npm run demo
-
-# This will:
-# - Prompt for a breach name (try "SolarWinds")
-# - Research using web tools
-# - Generate a structured intel report
-# - Save to reports/solarwinds-[timestamp].md
+# Run
+pnpm dev
 ```
 
-## Implementation Approach
+## How It Works
 
-The research assistant is built on Mastra's workflows architecture for better orchestration and human interaction:
+```
+1. User Input → "Analyze the Snowflake breach"
+        │
+2. RAG Query → Search historical breaches for similar incidents
+        │
+3. Web Research → Fetch latest CVEs, advisories, threat intel
+        │
+4. Working Memory → Accumulate findings + context
+        │
+5. Report Generation → PDF-ready 5-section report
+        │
+6. RAG Storage → Persist for future queries
+```
 
-1. **Workflow-Based Architecture**:
-   - `mainWorkflow`: Coordinates the entire research process
-   - `researchWorkflow`: Handles the core research functionality with suspend/resume for user interaction
-   - Human-in-the-loop experience with approval gates and iterative research
+## Report Structure
 
-2. **Research Agent with Custom Tools**:
-   - `webSearchTool`: Searches the web using the Exa API for relevant information
-   - `evaluateResultTool`: Assesses result relevance to the research topic
-   - `extractLearningsTool`: Identifies key learnings and generates follow-up questions
+| Section | Contents |
+|---------|----------|
+| **1. Executive Summary** | Non-technical overview, key insights |
+| **2. Technical Analysis** | Attack chain, root cause, exploit path |
+| **3. Recommended Solutions** | Immediate → Short-term → Long-term fixes |
+| **4. Research Journey** | Memory-driven reasoning, sources |
+| **5. Final Recommendations** | Prioritized action plan |
 
-3. **Report Generation**:
-   - `reportAgent`: Transforms research findings into comprehensive markdown reports
-   - Returns report content directly after user approval of research quality
+### Solution Categories
 
-## Key Benefits of Mastra vNext Implementation
+- **A.** Immediate Fixes (0-48h) - Patches, containment, credential rotation
+- **B.** Short-Term (1-2 weeks) - Hardening, logging, policy updates
+- **C.** Long-Term (1-3 months) - Architecture, zero-trust, identity overhaul
+- **D.** Automation - Detection agents, scanning workflows
+- **E.** Predictions - Attack evolution, sector threats
 
-1. **True Human-in-the-Loop Research**: Users can guide the research process, approve findings, and iterate when needed
+## Architecture
 
-2. **Suspend/Resume Capabilities**: The workflow can pause at strategic points to collect user input and feedback
+```
+Agents                    Tools                   Storage
+──────                    ─────                   ───────
+breachIntelAgent    →     ragTools          →     PgVector
+webResearcherAgent  →     webSearchTool     →     PostgresStore
+reportFormatter     →     workingMemoryTools      LibSQLVector
+ragEnhancedAgent                                  LibSQLStore
+```
 
-3. **Structured Workflow**: Clear separation between research, approval, and report generation phases
+## RAG Collections
 
-4. **Resilient Operation**: Robust error handling and fallback mechanisms when web searches fail
+| Collection | Data |
+|------------|------|
+| `breach_reports` | Historical breach analyses |
+| `cve_intelligence` | CVE details & vulnerabilities |
+| `threat_actors` | Threat actor profiles |
+| `security_advisories` | Security bulletins |
+| `mitre_attack_ttps` | MITRE ATT&CK mappings |
+| `indicators_of_compromise` | IOCs |
 
-5. **Modular Design**: Each component (workflows, agents, tools) can be maintained and upgraded independently
-
-## How to Use
+## Environment Variables
 
 ```bash
-# Install dependencies
-npm install
+# Required
+OPENAI_API_KEY=sk-...
+EXASEARCH_API_KEY=...
 
-# Run the research assistant
-npm run dev
+# Optional
+DATABASE_URL=file:./storage.db    # or postgresql://...
+MODEL=openai/gpt-4o
+EMBEDDINGS_MODEL=text-embedding-3-small
+RAG_TOP_K=5
 ```
 
-Follow the interactive prompts:
+## Commands
 
-1. Enter your research topic
-2. Review the research findings
-3. Approve or reject the research results
-4. If approved, a comprehensive report will be returned as output
+```bash
+pnpm dev              # Start Mastra dev server
+pnpm build            # Build for production
+pnpm start            # Run production build
 
-## Required Environment Variables
-
-Create a `.env` file with:
-
-```
-OPENAI_API_KEY="your-openai-api-key"
-EXASEARCH_API_KEY="your-exa-api-key"
+# Testing
+npx tsx src/examples/sanityTest.ts      # Full system test
+npx tsx src/examples/testDbConnection.ts # DB connectivity
+npx tsx src/mastra/scripts/seedRAG.ts    # Seed sample data
 ```
 
-Note: You can also use `EXA_API_KEY` for backwards compatibility, but `EXASEARCH_API_KEY` is the preferred variable name.
+## Storage Modes
 
-## Required Dependencies
+| `DATABASE_URL` | Storage | Vector |
+|----------------|---------|--------|
+| `postgresql://...` | PostgresStore | PgVector |
+| `file:./storage.db` | LibSQLStore | LibSQLVector |
 
-- `@mastra/core`: Core Mastra functionality with vNext workflows
-- `@ai-sdk/openai`: OpenAI models integration
-- `exa-js`: Exa API client for web search
-- `zod`: Schema definition and validation for workflows
+Auto-detected at startup. PostgreSQL recommended for production.
 
 ## Troubleshooting
 
-### Common Issues
+| Issue | Fix |
+|-------|-----|
+| `EXA_API_KEY not found` | Add to `.env`, restart server |
+| `Model not found` | Use format `openai/gpt-4o` |
+| Research too slow | Reduce `MAX_RESEARCH_STEPS` |
+| DB connection error | Check `DATABASE_URL` format |
 
-**Issue: "EXA_API_KEY not found"**
+## Documentation
 
-- Ensure you've created a `.env` file in the project root
-- Copy from `.env.example` and add your actual API key
-- Restart your development server after adding the key
+- [Technical Documentation](./TECHNICAL.md) - Architecture, API reference, data flow
+- [Schema](./schema.sql) - Database schema for PostgreSQL
 
-**Issue: "Model not found" errors**
+## License
 
-- Check that your MODEL in `.env` matches available models
-- Valid formats: `openai/gpt-4o-mini`, `anthropic/claude-sonnet-4-20250514`
-- See `.env.example` for all supported models
-
-**Issue: Research takes too long**
-
-- Reduce `SEARCH_RESULTS_PER_QUERY` in `.env` (default: 2)
-- Reduce `MAX_RESEARCH_STEPS` (default: 15)
-- Use faster models for summarization
-
-**Issue: Token limit exceeded**
-
-- Content summarization should prevent this, but if it occurs:
-- Reduce `MAX_SEARCH_TOKENS` in `.env`
-- Use more aggressive summarization models
-
-**Issue: Database connection errors**
-
-- By default, the app uses file-based storage (`file:./storage.db`) which requires no database server
-- If you see PostgreSQL connection errors, ensure `DATABASE_URL` in `.env` is set to `file:./storage.db` or a valid PostgreSQL connection string
-- The app automatically detects the URL scheme and uses the appropriate storage backend
+Apache-2.0
