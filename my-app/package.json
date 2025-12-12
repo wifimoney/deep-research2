@@ -1,0 +1,37 @@
+{
+  "name": "my-app",
+  "type": "module",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@mastra/hono": "^0.0.2-beta.6",
+    "@mastra/libsql": "^1.0.0-beta.7",
+    "@mastra/memory": "^1.0.0-beta.4",
+    "@mastra/pg": "^1.0.0-beta.7",
+    "@openrouter/ai-sdk-provider": "^0.4.3",
+    "ai": "^4.3.19",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "hono": "^4.10.8",
+    "pg": "^8.13.1",
+    "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^20.11.17",
+    "@types/pg": "^8.11.10",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}

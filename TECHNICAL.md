@@ -4,15 +4,15 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Mastra Core                              │
+│                         Mastra Core                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  Workflows          │  Agents              │  Storage            │
-│  ─────────          │  ──────              │  ───────            │
-│  breachReportWF     │  breachIntelAgent    │  PostgresStore      │
-│  researchWorkflow   │  webResearcherAgent  │  LibSQLStore        │
-│  generateReportWF   │  reportFormatter     │                     │
-│                     │  ragEnhancedAgent    │  PgVector           │
-│                     │  workingMemoryAgent  │  LibSQLVector       │
+│  Workflows          │  Agents              │  Storage           │
+│  ─────────          │  ──────              │  ───────           │
+│  breachReportWF     │  breachIntelAgent    │  PostgresStore     │
+│  researchWorkflow   │  webResearcherAgent  │  LibSQLStore       │
+│  generateReportWF   │  reportFormatter     │                    │
+│                     │  ragEnhancedAgent    │  PgVector          │
+│                     │  workingMemoryAgent  │  LibSQLVector      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
