@@ -6,6 +6,7 @@ import {
   findSimilarThreatsTool,
 } from '../tools/ragTools';
 import { analysisMemory } from '../config/memory';
+import { modelConfig } from '../config/config.js';
 
 export const breachIntelAgent = new Agent({
   id: 'breach-intel-agent',
@@ -74,7 +75,7 @@ Analyze breaches, hacks, and CVEs. Query RAG for similar incidents. Output a com
 - Do NOT hallucinate beyond findings
 - State assumptions clearly when info is missing
 - Be concise and actionable—no filler`,
-  model: process.env.MODEL || 'openai/gpt-4o',
+  model: modelConfig.default,
   defaultGenerateOptions: {
     temperature: 0.2,
   },

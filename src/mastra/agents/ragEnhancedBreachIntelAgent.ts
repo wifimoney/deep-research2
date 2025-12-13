@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { modelConfig } from '../config/config.js';
 import { findSimilarThreatsTool, retrieveBreachIntelTool } from '../tools/ragTools';
 import { httpFetchTool } from '../tools/httpFetchTool';
 import { analysisMemory } from '../config/memory';
@@ -23,7 +24,7 @@ For every incident, provide:
 7. How an autonomous agent could detect or prevent this attack
 
 Be explicit when context is retrieved from RAG and when assumptions are made.`,
-  model: process.env.MODEL || 'openai/gpt-4o',
+  model: modelConfig.default,
   defaultGenerateOptions: {
     temperature: 0.2,
   },

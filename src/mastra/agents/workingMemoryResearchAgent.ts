@@ -2,6 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { webSearchTool } from '../tools/webSearchTool';
 import { httpFetchTool } from '../tools/httpFetchTool';
 import { researchMemory } from '../config/memory';
+import { modelConfig } from '../config/config.js';
 
 /**
  * Research Agent with Mastra Memory
@@ -124,7 +125,7 @@ Final Output:
 \`\`\`
 
 **Remember**: Your memory automatically tracks everything. Review conversation history, reference past findings, and build on accumulated knowledge throughout the session.`,
-  model: process.env.MODEL || 'openai/gpt-4o',
+  model: modelConfig.default,
   tools: {
     webSearchTool,
     httpFetchTool,

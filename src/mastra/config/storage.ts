@@ -14,16 +14,10 @@
 
 import { LibSQLStore, LibSQLVector } from '@mastra/libsql';
 import { PostgresStore, PgVector } from '@mastra/pg';
+import { databaseConfig, storageConfig } from './config.js';
 
-// Read DATABASE_URL - single source of truth
-let databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./storage.db';
-
-// Fix malformed DATABASE_URL if it contains the key as part of the value
-if (databaseUrl.startsWith('DATABASE_URL=')) {
-  databaseUrl = databaseUrl.replace('DATABASE_URL=', '');
-}
-
-const isPostgres = databaseUrl.startsWith('postgresql://');
+// Use centralized database configuration
+const { url: databaseUrl, isPostgres, connectionString } = databaseConfig;
 
 console.log(`[Storage] Using ${isPostgres ? 'PostgreSQL' : 'LibSQL'} backend`);
 console.log(`[Storage] Database URL: ${databaseUrl.substring(0, 50)}...`);
@@ -35,23 +29,16 @@ export let vector: LibSQLVector | PgVector;
 try {
   if (isPostgres) {
     // PostgreSQL for production - single connection for everything
-    // Only add SSL for remote connections (not localhost/127.0.0.1)
-    let connectionString = databaseUrl;
-    const isLocalhost = databaseUrl.includes('@localhost') || databaseUrl.includes('@127.0.0.1');
-    if (!isLocalhost && !connectionString.includes('sslmode=')) {
-      connectionString += connectionString.includes('?') ? '&sslmode=require' : '?sslmode=require';
-    }
-    
     console.log('[Storage] Creating shared PostgresStore...');
     storage = new PostgresStore({
-      id: 'mastra-storage',
+      id: storageConfig.ids.storage,
       connectionString,
     });
     console.log('[Storage] PostgresStore created:', !!storage);
     
     console.log('[Storage] Creating shared PgVector...');
     vector = new PgVector({
-      id: 'mastra-vector',
+      id: storageConfig.ids.vector,
       connectionString,
     });
     console.log('[Storage] PgVector created:', !!vector);
@@ -114,4 +101,7 @@ ensureStorageInitialized().catch((error) => {
 // Export connection info for debugging
 export const isPostgresBackend = isPostgres;
 export const databaseUrlInfo = databaseUrl.substring(0, 50) + '...';
+
+// Re-export config for convenience
+export { databaseConfig, storageConfig } from './config.js';
 

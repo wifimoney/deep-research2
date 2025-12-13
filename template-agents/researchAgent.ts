@@ -3,6 +3,7 @@ import { evaluateResultTool } from '../src/mastra/tools/evaluateResultTool';
 import { extractLearningsTool } from '../src/mastra/tools/extractLearningsTool';
 import { webSearchTool } from '../src/mastra/tools/webSearchTool';
 import { researchMemory } from '../src/mastra/config/memory';
+import { modelConfig } from '../src/mastra/config/config.js';
 
 export const researchAgent = new Agent({
   id: 'research-agent',
@@ -41,7 +42,7 @@ export const researchAgent = new Agent({
 
   Use all the tools available to you systematically and stop after the follow-up phase.
   `,
-  model: process.env.MODEL || 'openai/gpt-4o',
+  model: modelConfig.models.research,
   tools: {
     webSearchTool,
     evaluateResultTool,

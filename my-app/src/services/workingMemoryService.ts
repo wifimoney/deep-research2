@@ -44,7 +44,7 @@ export async function getWorkingMemory(
 
   // Extract working memory state from thread metadata
   const metadata = thread.metadata || {}
-  const wmData = metadata.workingMemory || {}
+  const wmData = (metadata.workingMemory || {}) as Partial<WorkingMemoryState>
 
   return {
     findings: wmData.findings || [],
@@ -110,7 +110,7 @@ export async function setWorkingMemory(
   // Update thread metadata with new working memory state
   await storage.updateThread({
     id: threadId,
-    title: thread.title,
+    title: thread.title || 'Chat',
     metadata: {
       ...thread.metadata,
       workingMemory: updatedState,
@@ -250,7 +250,7 @@ export async function clearWorkingMemory(
 
   await storage.updateThread({
     id: threadId,
-    title: thread.title,
+    title: thread.title || 'Chat',
     metadata,
   })
 }
@@ -271,7 +271,7 @@ export async function clearAllUserWorkingMemory(userId: string): Promise<void> {
 
     await storage.updateThread({
       id: thread.id,
-      title: thread.title,
+      title: thread.title || 'Chat',
       metadata,
     })
   }

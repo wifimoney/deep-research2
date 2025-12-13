@@ -39,6 +39,13 @@ export type SemanticRecallConfig = {
   messageRange?: number;
   /** Search scope: 'resource' for all threads owned by user, 'thread' for current thread only */
   scope?: 'resource' | 'thread';
+  /** HNSW index configuration for optimal performance */
+  indexConfig?: {
+    type: 'hnsw';
+    metric: 'dotproduct' | 'cosine' | 'euclidean';
+    m?: number;
+    efConstruction?: number;
+  };
 };
 
 /**

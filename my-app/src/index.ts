@@ -8,6 +8,7 @@ import apiRoutes from './routes/api.js'
 import { requireAuth } from './middleware/auth.js'
 import { renderDashboard } from './views/auth.js'
 import { closePool } from './db/postgres.js'
+import { serverConfig } from '../../src/mastra/config/config.js'
 
 const app = new Hono()
 
@@ -41,7 +42,7 @@ app.get('/health', (c) => {
 })
 
 // Start server
-const port = parseInt(process.env.PORT || '3000', 10)
+const port = serverConfig.port
 
 const server = serve({
   fetch: app.fetch,

@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { standardMemory } from '../src/mastra/config/memory';
+import { modelConfig } from '../src/mastra/config/config.js';
 
 export const reportAgent = new Agent({
   id: 'report-agent',
@@ -26,6 +27,6 @@ export const reportAgent = new Agent({
 
   Structure your reports with clear sections, headings, and focus on synthesizing the information
   into a cohesive narrative rather than simply listing facts.`,
-  model: process.env.MODEL || 'openai/gpt-4.1',
+  model: modelConfig.models.report,
   memory: standardMemory,
 });

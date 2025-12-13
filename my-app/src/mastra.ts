@@ -1,6 +1,6 @@
 import { Mastra } from '@mastra/core/mastra';
-import { standardMemory as memory } from '../src/mastra/config/memory.js';
-import { storage } from '../src/mastra/config/storage.js';
+import { standardMemory as memory } from '../../src/mastra/config/memory.js';
+import { storage } from '../../src/mastra/config/storage.js';
 import { chatAgent } from './agents/chatAgent.js';
 
 // Create Mastra instance
@@ -11,11 +11,7 @@ export const mastra = new Mastra({
   agents: {
     chatAgent,
   },
-  observability: {
-    default: {
-      enabled: true, // Enabled for Mastra Studio - traces will appear automatically
-    },
-  },
+  // Observability is enabled automatically when running 'mastra dev'
 });
 
 // Re-export memory and storage instances for use in services

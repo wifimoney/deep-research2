@@ -7,6 +7,7 @@ import {
   findSimilarThreatsTool,
 } from '../tools/ragTools';
 import { researchMemory } from '../config/memory';
+import { modelConfig } from '../config/config.js';
 
 export const webResearcherAgent = new Agent({
   id: 'web-researcher-agent',
@@ -200,7 +201,7 @@ Use industry-standard terminology:
 - CVSSv3 scoring format: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
 
 Your research output will feed directly into intelligence analysis, so accuracy and completeness are paramount.`,
-  model: process.env.MODEL || 'openai/gpt-4o',
+  model: modelConfig.default,
   defaultGenerateOptions: {
     temperature: 0.3,
   },

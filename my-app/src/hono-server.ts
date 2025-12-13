@@ -7,13 +7,14 @@ import type { HonoBindings, HonoVariables } from "@mastra/hono";
 import { MastraServer } from "@mastra/hono";
 import { mastra } from "./mastra.js";
 import agentRoutes from './routes/agent.js';
+import { serverConfig } from '../../src/mastra/config/config.js';
 
 const app = new Hono<{ Bindings: HonoBindings; Variables: HonoVariables }>();
 
 // Middleware
 app.use('*', logger());
 app.use('/api/*', cors({
-  origin: ['http://localhost:3000', 'http://localhost:4111'],
+  origin: [`http://localhost:${serverConfig.port}`, `http://localhost:${serverConfig.mastraPort}`],
   credentials: true,
 }));
 
@@ -33,7 +34,7 @@ app.get('/health', (c) => {
   });
 });
 
-const port = parseInt(process.env.MASTRA_PORT || '4111', 10);
+const port = serverConfig.mastraPort;
 
 serve({ fetch: app.fetch, port }, () => {
   console.log(`Mastra server running on http://localhost:${port}`);

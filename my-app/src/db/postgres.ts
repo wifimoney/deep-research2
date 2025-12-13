@@ -1,14 +1,15 @@
 import pg from 'pg'
 import { config } from 'dotenv'
 import { resolve } from 'path'
+import { databaseConfig } from '../../../src/mastra/config/config.js'
 
 // Load .env file explicitly from the my-app directory
 config({ path: resolve(process.cwd(), '.env') })
 
 const { Pool } = pg
 
-// Validate DATABASE_URL is set
-const databaseUrl = process.env.DATABASE_URL
+// Use centralized database configuration
+const databaseUrl = databaseConfig.url
 if (!databaseUrl) {
   console.error('ERROR: DATABASE_URL environment variable is not set')
   console.error('Set it in .env file or pass it as an environment variable')
@@ -17,7 +18,7 @@ if (!databaseUrl) {
 
 // Create connection pool
 const pool = new Pool({
-  connectionString: databaseUrl,
+  connectionString: databaseConfig.isPostgres ? databaseConfig.connectionString : databaseUrl,
 })
 
 // Test connection on startup

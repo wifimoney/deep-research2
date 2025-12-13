@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { modelConfig } from '../config/config.js';
 import {
   storeBreachIntelTool,
   retrieveBreachIntelTool,
@@ -46,7 +47,7 @@ Generate reports in this markdown structure:
 - Include both urgent tactical actions and strategic improvements
 
 Your report will drive security decisions and resource allocation. Be precise, be actionable, be clear.`,
-  model: process.env.MODEL || 'openai/gpt-4o',
+  model: modelConfig.default,
   defaultGenerateOptions: {
     temperature: 0.2,
   },

@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { modelConfig } from '../src/mastra/config/config.js';
 import { lightweightMemory } from '../src/mastra/config/memory';
 
 export const learningExtractionAgent = new Agent({
@@ -18,6 +19,6 @@ export const learningExtractionAgent = new Agent({
   - Consider the original research query context when extracting insights
 
   3. Generate 1 relevant follow-up question that would deepen the research`,
-  model: process.env.MODEL || 'openai/gpt-4.1',
+  model: modelConfig.models.learning,
   memory: lightweightMemory,
 });

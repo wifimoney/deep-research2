@@ -2,10 +2,11 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import Exa from 'exa-js';
 import 'dotenv/config';
+import { apiKeysConfig } from '../config/config.js';
 
 // Helper to get Exa API key
-// Exa library expects EXASEARCH_API_KEY, but we support EXA_API_KEY for backwards compatibility
-const getExaApiKey = () => process.env.EXASEARCH_API_KEY || process.env.EXA_API_KEY;
+// Uses centralized config
+const getExaApiKey = () => apiKeysConfig.exa;
 
 export const webSearchTool = createTool({
   id: 'web-search',

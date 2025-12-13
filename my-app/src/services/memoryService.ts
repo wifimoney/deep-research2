@@ -12,6 +12,7 @@ import { chatAgent } from '../agents/chatAgent.js'
 import { standardMemory as memory } from '../../../src/mastra/config/memory.js'
 import { storage, ensureStorageInitialized } from '../../../src/mastra/config/storage.js'
 import { getWorkingMemorySummary } from './workingMemoryService.js'
+import { apiKeysConfig } from '../../../src/mastra/config/config.js'
 
 /**
  * Message type for API responses
@@ -197,8 +198,8 @@ export async function sendMessage(
   includeWorkingMemory = false
 ): Promise<AgentResponse> {
   // Check for required environment variables
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
-    throw new Error('API key not configured. Please set OPENROUTER_API_KEY environment variable in your .env file.')
+  if (!apiKeysConfig.hasAiKey) {
+    throw new Error('API key not configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY environment variable in your .env file.')
   }
 
   // Ensure storage is initialized

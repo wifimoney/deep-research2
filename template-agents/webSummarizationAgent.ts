@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { modelConfig } from '../src/mastra/config/config.js';
 import { lightweightMemory } from '../src/mastra/config/memory';
 
 export const webSummarizationAgent = new Agent({
@@ -80,6 +81,6 @@ Format your summaries with:
 
 Always provide summaries that capture the core value of the web content without losing critical details.
   `,
-  model: process.env.MODEL || 'openai/gpt-4.1-mini', // Efficient model for summarization
+  model: modelConfig.models.summarization, // Efficient model for summarization
   memory: lightweightMemory,
 });

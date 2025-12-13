@@ -37,10 +37,12 @@ export type RAGSearchResult = {
   metadata?: DocumentMetadata;
 };
 
-const EMBEDDINGS_MODEL = process.env.EMBEDDINGS_MODEL || 'text-embedding-3-small';
-const DEFAULT_EMBEDDING_DIMENSIONS = Number(process.env.EMBEDDINGS_DIMENSIONS || 1536);
-const DEFAULT_TOP_K = Number(process.env.RAG_TOP_K || 5);
-const DEFAULT_MIN_SCORE = process.env.RAG_MIN_SCORE ? Number(process.env.RAG_MIN_SCORE) : 0;
+import { modelConfig, ragConfig } from './config.js';
+
+const EMBEDDINGS_MODEL = modelConfig.embeddings;
+const DEFAULT_EMBEDDING_DIMENSIONS = modelConfig.embeddingsDimensions;
+const DEFAULT_TOP_K = ragConfig.topK;
+const DEFAULT_MIN_SCORE = ragConfig.minScore;
 
 async function ensureIndex(indexName: RAGCollection, dimension: number = DEFAULT_EMBEDDING_DIMENSIONS) {
   const existing = await vectorStore.listIndexes();
