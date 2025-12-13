@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { memory } from '../config/memory.js';
+import { standardMemory as memory } from '../../../src/mastra/config/memory.js';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 
 /**

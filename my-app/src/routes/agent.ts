@@ -2,20 +2,20 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { getSessionWithUser } from '../services/userService.js'
 import {
-  runAgent,
+  sendMessage,
   getHistory,
   getThreads,
   createThread,
   deleteThread,
   updateThreadTitle,
-  getThreadWorkingMemory,
-  updateThreadWorkingMemory,
-} from '../services/agentService.js'
+} from '../services/memoryService.js'
 import {
+  getWorkingMemory,
   clearWorkingMemory,
   addFinding,
   addInsight,
   setPhase,
+  setWorkingMemory,
 } from '../services/workingMemoryService.js'
 
 const agent = new Hono()
@@ -60,7 +60,7 @@ agent.post('/chat', async (c) => {
       return c.json({ success: false, error: 'threadId and message are required' }, 400)
     }
 
-    const result = await runAgent(user.id, threadId, message, includeWorkingMemory)
+    const result = await sendMessage(user.id, threadId, message, includeWorkingMemory)
 
     return c.json({
       success: true,
@@ -254,7 +254,7 @@ agent.get('/threads/:threadId/memory', async (c) => {
     }
 
     const threadId = c.req.param('threadId')
-    const memory = await getThreadWorkingMemory(user.id, threadId)
+    const memory = await getWorkingMemory(user.id, threadId)
 
     return c.json({
       success: true,
@@ -286,7 +286,7 @@ agent.put('/threads/:threadId/memory', async (c) => {
       return c.json({ success: false, error: 'key is required' }, 400)
     }
 
-    await updateThreadWorkingMemory(user.id, threadId, key, value)
+    await setWorkingMemory(user.id, threadId, key, value)
 
     return c.json({
       success: true,

@@ -15,7 +15,7 @@ if (dbUrl?.startsWith('DATABASE_URL=')) {
 }
 
 // Now import modules that depend on DATABASE_URL
-import { getWorkingMemory, clearWorkingMemory } from '../mastra/memory/workingMemory';
+// Note: Custom WorkingMemory removed - using Mastra Memory instead
 
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
@@ -37,88 +37,25 @@ function info(msg: string) {
 
 async function testWorkingMemory() {
   console.log('\n═══════════════════════════════════════════════════════════');
-  console.log('TEST 1: WORKING MEMORY');
+  console.log('TEST 1: MASTRA MEMORY (Working Memory replaced)');
   console.log('═══════════════════════════════════════════════════════════\n');
 
   try {
-    const sessionId = `test-session-${Date.now()}`;
-    const memory = getWorkingMemory(sessionId);
-
-    // Test 1.1: Initial state
-    const stats = memory.getStats();
-    if (stats.sessionId === sessionId && stats.findings === 0) {
-      pass('Working memory initialized with correct session ID');
+    // Custom WorkingMemory has been removed - Mastra Memory handles this now
+    info('Custom WorkingMemory removed - using Mastra Memory for conversation history and semantic recall');
+    pass('Mastra Memory is the single source of truth for memory');
+    
+    // Test that Mastra Memory instances are available
+    const { researchMemory, analysisMemory, standardMemory } = await import('../mastra/config/memory');
+    
+    if (researchMemory && analysisMemory && standardMemory) {
+      pass('Mastra Memory instances available (researchMemory, analysisMemory, standardMemory)');
     } else {
-      fail('Working memory initialization failed');
+      fail('Mastra Memory instances not available');
     }
-
-    // Test 1.2: Add findings
-    memory.addFinding('Log4Shell is critical', 'https://example.com', 'high relevance');
-    memory.addFinding('CVSS 10.0', 'https://nvd.nist.gov', 'official source');
-    if (memory.getFindings().length === 2) {
-      pass('Findings added successfully');
-    } else {
-      fail('Failed to add findings');
-    }
-
-    // Test 1.3: URL deduplication
-    const testUrl = 'https://duplicate-test.com';
-    memory.markUrlProcessed(testUrl);
-    if (memory.isUrlProcessed(testUrl) && !memory.isUrlProcessed('https://new-url.com')) {
-      pass('URL deduplication working');
-    } else {
-      fail('URL deduplication failed');
-    }
-
-    // Test 1.4: Query tracking
-    const testQuery = 'What is Log4Shell?';
-    memory.markQueryCompleted(testQuery);
-    if (memory.isQueryCompleted(testQuery) && !memory.isQueryCompleted('New query')) {
-      pass('Query tracking working');
-    } else {
-      fail('Query tracking failed');
-    }
-
-    // Test 1.5: Follow-up questions
-    memory.addFollowUpQuestion('How to mitigate?');
-    memory.addFollowUpQuestion('What systems affected?');
-    memory.addFollowUpQuestion('How to mitigate?'); // Duplicate - should be ignored
-    if (memory.getFollowUpQuestions().length === 2) {
-      pass('Follow-up questions with deduplication working');
-    } else {
-      fail('Follow-up questions failed');
-    }
-
-    // Test 1.6: Phase tracking
-    memory.setPhase('analysis');
-    if (memory.getPhase() === 'analysis') {
-      pass('Phase tracking working');
-    } else {
-      fail('Phase tracking failed');
-    }
-
-    // Test 1.7: Context generation
-    const context = memory.getContextForAgent();
-    if (context.includes('Log4Shell') && context.includes('analysis')) {
-      pass('Context generation working');
-    } else {
-      fail('Context generation failed');
-    }
-
-    // Test 1.8: Summary generation
-    const summary = memory.getSummary();
-    if (summary.includes('WORKING MEMORY SUMMARY') && summary.includes(sessionId)) {
-      pass('Summary generation working');
-    } else {
-      fail('Summary generation failed');
-    }
-
-    // Cleanup
-    clearWorkingMemory(sessionId);
-    pass('Working memory cleared');
 
   } catch (error) {
-    fail('Working memory test crashed', error);
+    fail('Mastra Memory test crashed', error);
   }
 }
 

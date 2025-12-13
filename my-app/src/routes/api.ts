@@ -15,7 +15,7 @@ import {
   getThreads,
   createThread,
   cleanupEmptyThreads,
-} from '../services/chatService.js'
+} from '../services/memoryService.js'
 
 const api = new Hono()
 

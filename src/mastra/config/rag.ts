@@ -1,8 +1,15 @@
 import { randomUUID } from 'crypto';
 import { embedMany } from 'ai';
-import { LibSQLVector } from '@mastra/libsql';
-import { PgVector } from '@mastra/pg';
 import { openai } from '@ai-sdk/openai';
+import { vector as vectorStore } from './storage.js';
+
+/**
+ * RAG Configuration
+ * 
+ * Uses shared vector instance from storage.ts - single PostgreSQL database.
+ * All RAG collections (breach reports, CVEs, threat actors, etc.) are stored
+ * in the same database as memory and conversation history.
+ */
 
 export const RAG_COLLECTIONS = {
   BREACH_REPORTS: 'breach_reports',
@@ -30,40 +37,10 @@ export type RAGSearchResult = {
   metadata?: DocumentMetadata;
 };
 
-// Use DATABASE_URL for PostgreSQL, or VECTOR_DB_URL/fallback for LibSQL
-let databaseUrl = process.env.DATABASE_URL?.trim();
-
-// Fix malformed DATABASE_URL if it contains the key as part of the value
-if (databaseUrl?.startsWith('DATABASE_URL=')) {
-  databaseUrl = databaseUrl.replace('DATABASE_URL=', '');
-}
-
-let VECTOR_DB_URL = databaseUrl || process.env.VECTOR_DB_URL || 'file:../breach-intel-vectors.db';
-const isPostgres = VECTOR_DB_URL.startsWith('postgresql://');
-
-// Only add SSL for remote connections (not localhost/127.0.0.1)
-const isLocalhost = VECTOR_DB_URL.includes('@localhost') || VECTOR_DB_URL.includes('@127.0.0.1');
-if (isPostgres && !isLocalhost && !VECTOR_DB_URL.includes('sslmode=')) {
-  VECTOR_DB_URL += VECTOR_DB_URL.includes('?') ? '&sslmode=require' : '?sslmode=require';
-}
-
 const EMBEDDINGS_MODEL = process.env.EMBEDDINGS_MODEL || 'text-embedding-3-small';
 const DEFAULT_EMBEDDING_DIMENSIONS = Number(process.env.EMBEDDINGS_DIMENSIONS || 1536);
 const DEFAULT_TOP_K = Number(process.env.RAG_TOP_K || 5);
 const DEFAULT_MIN_SCORE = process.env.RAG_MIN_SCORE ? Number(process.env.RAG_MIN_SCORE) : 0;
-
-// Use PostgreSQL for production, LibSQL for local development
-let vectorStore: LibSQLVector | PgVector;
-
-if (isPostgres) {
-  vectorStore = new PgVector({
-    connectionString: VECTOR_DB_URL,
-  });
-} else {
-  vectorStore = new LibSQLVector({
-    connectionUrl: VECTOR_DB_URL,
-  });
-}
 
 async function ensureIndex(indexName: RAGCollection, dimension: number = DEFAULT_EMBEDDING_DIMENSIONS) {
   const existing = await vectorStore.listIndexes();
@@ -212,7 +189,6 @@ export const breachIntelMemory = {
   vectorStore,
   config: {
     model: EMBEDDINGS_MODEL,
-    vectorDbUrl: VECTOR_DB_URL,
     defaultTopK: DEFAULT_TOP_K,
     defaultMinScore: DEFAULT_MIN_SCORE,
     defaultEmbeddingDimensions: DEFAULT_EMBEDDING_DIMENSIONS,

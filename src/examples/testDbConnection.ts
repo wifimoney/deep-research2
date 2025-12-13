@@ -27,14 +27,14 @@ async function testConnection() {
   console.log('');
 
   try {
-    const memoryModule = await import('../mastra/config/memory');
+    const storageModule = await import('../mastra/config/storage');
     const ragModule = await import('../mastra/config/rag');
     
-    console.log('[DEBUG] memoryModule exports:', Object.keys(memoryModule));
-    console.log('[DEBUG] memoryStorage from module:', memoryModule.memoryStorage);
-    console.log('[DEBUG] typeof memoryStorage:', typeof memoryModule.memoryStorage);
+    console.log('[DEBUG] storageModule exports:', Object.keys(storageModule));
+    console.log('[DEBUG] storage from module:', storageModule.storage);
+    console.log('[DEBUG] typeof storage:', typeof storageModule.storage);
     
-    const { memoryStorage } = memoryModule;
+    const { storage: memoryStorage } = storageModule;
     const { breachIntelMemory } = ragModule;
 
     if (!memoryStorage) {

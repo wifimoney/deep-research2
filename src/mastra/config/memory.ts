@@ -1,6 +1,9 @@
 import { Memory } from '@mastra/memory';
-import { LibSQLStore, LibSQLVector } from '@mastra/libsql';
-import { PostgresStore, PgVector } from '@mastra/pg';
+import { ModelRouterEmbeddingModel } from '@mastra/core/llm';
+import { storage as memoryStorage, vector as memoryVector } from './storage.js';
+
+// Re-export ensureStorageInitialized for convenience (used by services)
+export { ensureStorageInitialized } from './storage.js';
 
 /**
  * Semantic Recall Configuration
@@ -21,67 +24,10 @@ import { PostgresStore, PgVector } from '@mastra/pg';
  * Database support:
  * - PostgreSQL: Set DATABASE_URL to postgresql://... for production
  * - LibSQL: Set DATABASE_URL to file:./... for local development
+ * 
+ * NOTE: Storage and vector instances are shared from ./storage.ts
+ * All modules use the same PostgreSQL database connection.
  */
-
-// Determine which storage backend to use based on DATABASE_URL
-// If DATABASE_URL starts with 'postgresql://', use PostgresStore + PgVector
-// Otherwise, use LibSQLStore + LibSQLVector (supports file:, libsql:, etc.)
-let databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./memory-storage.db';
-
-// Fix malformed DATABASE_URL if it contains the key as part of the value
-if (databaseUrl.startsWith('DATABASE_URL=')) {
-  databaseUrl = databaseUrl.replace('DATABASE_URL=', '');
-}
-
-const isPostgres = databaseUrl.startsWith('postgresql://');
-
-console.log(`[Memory] Using ${isPostgres ? 'PostgreSQL' : 'LibSQL'} backend`);
-console.log(`[Memory] Database URL: ${databaseUrl.substring(0, 50)}...`);
-
-// Shared storage and vector instances for all memory
-let memoryStorage: LibSQLStore | PostgresStore;
-let memoryVector: LibSQLVector | PgVector;
-
-try {
-  if (isPostgres) {
-    // PostgreSQL for production deployments
-    // Only add SSL for remote connections (not localhost/127.0.0.1)
-    let connectionString = databaseUrl;
-    const isLocalhost = databaseUrl.includes('@localhost') || databaseUrl.includes('@127.0.0.1');
-    if (!isLocalhost && !connectionString.includes('sslmode=')) {
-      connectionString += connectionString.includes('?') ? '&sslmode=require' : '?sslmode=require';
-    }
-    
-    console.log('[Memory] Creating PostgresStore...');
-    memoryStorage = new PostgresStore({
-      connectionString,
-    });
-    console.log('[Memory] PostgresStore created:', !!memoryStorage);
-    
-    console.log('[Memory] Creating PgVector...');
-    memoryVector = new PgVector({
-      connectionString,
-    });
-    console.log('[Memory] PgVector created:', !!memoryVector);
-  } else {
-    // LibSQL for local development
-    console.log('[Memory] Creating LibSQLStore...');
-    memoryStorage = new LibSQLStore({
-      url: databaseUrl,
-    });
-    console.log('[Memory] LibSQLStore created:', !!memoryStorage);
-    
-    console.log('[Memory] Creating LibSQLVector...');
-    memoryVector = new LibSQLVector({
-      connectionUrl: databaseUrl,
-    });
-    console.log('[Memory] LibSQLVector created:', !!memoryVector);
-  }
-  console.log('[Memory] Initialization complete');
-} catch (error) {
-  console.error('[Memory] Failed to initialize storage:', error);
-  throw error;
-}
 
 /**
  * Semantic recall configuration options
@@ -143,7 +89,17 @@ export function createMemory(config: MemoryConfig = {}): Memory {
 
   // Build semantic recall options
   // Ensure all required properties are present (topK and messageRange must be numbers, not undefined)
-  let semanticRecallOptions: false | { topK: number; messageRange: number; scope?: 'thread' | 'resource' };
+  let semanticRecallOptions: false | { 
+    topK: number; 
+    messageRange: number; 
+    scope?: 'thread' | 'resource';
+    indexConfig?: {
+      type: 'hnsw';
+      metric: 'dotproduct' | 'cosine' | 'euclidean';
+      m?: number;
+      efConstruction?: number;
+    };
+  };
 
   if (semanticRecall === false) {
     semanticRecallOptions = false;
@@ -152,6 +108,12 @@ export function createMemory(config: MemoryConfig = {}): Memory {
       topK: DEFAULT_SEMANTIC_RECALL.topK!,
       messageRange: DEFAULT_SEMANTIC_RECALL.messageRange!,
       scope: DEFAULT_SEMANTIC_RECALL.scope,
+      indexConfig: {
+        type: 'hnsw',
+        metric: 'dotproduct',
+        m: 16,
+        efConstruction: 64,
+      },
     };
   } else {
     // Custom config - merge with defaults, ensuring required properties are numbers
@@ -159,14 +121,19 @@ export function createMemory(config: MemoryConfig = {}): Memory {
       topK: semanticRecall.topK ?? DEFAULT_SEMANTIC_RECALL.topK!,
       messageRange: semanticRecall.messageRange ?? DEFAULT_SEMANTIC_RECALL.messageRange!,
       scope: semanticRecall.scope ?? DEFAULT_SEMANTIC_RECALL.scope,
+      indexConfig: semanticRecall.indexConfig ?? {
+        type: 'hnsw',
+        metric: 'dotproduct',
+        m: 16,
+        efConstruction: 64,
+      },
     };
   }
 
   return new Memory({
     storage: memoryStorage,
     vector: memoryVector,
-    // Use model router for embeddings with autocomplete support
-    embedder: 'openai/text-embedding-3-small',
+    embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
     options: {
       lastMessages,
       semanticRecall: semanticRecallOptions,
@@ -226,10 +193,6 @@ export const lightweightMemory = createMemory({
   semanticRecall: false,
 });
 
-/**
- * Export shared instances for direct use
- */
-export { memoryStorage, memoryVector };
 
 // ============================================================================
 // CHAPTER 7 WRAPPER FUNCTIONS
@@ -266,7 +229,7 @@ export async function addMessage(
   const memory = new Memory({
     storage: memoryStorage,
     vector: memoryVector,
-    embedder: 'openai/text-embedding-3-small',
+    embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
   });
 
   // Save message using Memory's internal storage API
@@ -301,7 +264,7 @@ export async function getRecentMessages(
   const memory = new Memory({
     storage: memoryStorage,
     vector: memoryVector,
-    embedder: 'openai/text-embedding-3-small',
+    embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
   });
 
   // Use Memory.query() which has the correct API
@@ -416,7 +379,7 @@ export async function getThreadsByResource(
   const memory = new Memory({
     storage: memoryStorage,
     vector: memoryVector,
-    embedder: 'openai/text-embedding-3-small',
+    embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
   });
 
   // Use paginated version if limit is needed, otherwise use non-paginated

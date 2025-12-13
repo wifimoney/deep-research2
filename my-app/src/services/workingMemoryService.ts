@@ -1,21 +1,9 @@
-import { query } from '../db/postgres.js'
-
-/**
- * Working Memory Entry Type
- */
-export interface WorkingMemoryEntry {
-  id: string
-  user_id: string
-  thread_id: string
-  key: string
-  value: any
-  created_at: Date
-  updated_at: Date
-}
+import { storage, ensureStorageInitialized } from '../../../src/mastra/config/storage.js'
 
 /**
  * Working Memory State
  * Aggregated view of all key-value pairs for a user/thread
+ * Stored in thread metadata using Mastra Memory
  */
 export interface WorkingMemoryState {
   findings: Array<{ finding: string; source: string; relevance: string }>
@@ -29,64 +17,49 @@ export interface WorkingMemoryState {
 }
 
 /**
- * Get all working memory entries for a user and thread
+ * Get all working memory entries for a user and thread from thread metadata
  */
 export async function getWorkingMemory(
   userId: string,
   threadId: string
 ): Promise<WorkingMemoryState> {
-  const result = await query<WorkingMemoryEntry>(
-    `SELECT id, user_id, thread_id, key, value, created_at, updated_at
-     FROM working_memory
-     WHERE user_id = $1 AND thread_id = $2`,
-    [userId, threadId]
-  )
+  await ensureStorageInitialized()
 
-  // Build state from key-value entries
-  const state: WorkingMemoryState = {
-    findings: [],
-    insights: [],
-    decisions: [],
-    processedUrls: [],
-    completedQueries: [],
-    followUpQuestions: [],
-    phase: 'initial',
-    customData: {},
-  }
-
-  for (const entry of result.rows) {
-    switch (entry.key) {
-      case 'findings':
-        state.findings = entry.value || []
-        break
-      case 'insights':
-        state.insights = entry.value || []
-        break
-      case 'decisions':
-        state.decisions = entry.value || []
-        break
-      case 'processedUrls':
-        state.processedUrls = entry.value || []
-        break
-      case 'completedQueries':
-        state.completedQueries = entry.value || []
-        break
-      case 'followUpQuestions':
-        state.followUpQuestions = entry.value || []
-        break
-      case 'phase':
-        state.phase = entry.value || 'initial'
-        break
-      default:
-        state.customData[entry.key] = entry.value
+  // Get thread from Mastra Memory storage
+  const thread = await storage.getThreadById({ threadId })
+  
+  if (!thread) {
+    // Return default state if thread doesn't exist
+    return {
+      findings: [],
+      insights: [],
+      decisions: [],
+      processedUrls: [],
+      completedQueries: [],
+      followUpQuestions: [],
+      phase: 'initial',
+      customData: {},
     }
   }
 
-  return state
+  // Extract working memory state from thread metadata
+  const metadata = thread.metadata || {}
+  const wmData = metadata.workingMemory || {}
+
+  return {
+    findings: wmData.findings || [],
+    insights: wmData.insights || [],
+    decisions: wmData.decisions || [],
+    processedUrls: wmData.processedUrls || [],
+    completedQueries: wmData.completedQueries || [],
+    followUpQuestions: wmData.followUpQuestions || [],
+    phase: wmData.phase || 'initial',
+    customData: wmData.customData || {},
+  }
 }
 
 /**
- * Set a working memory value (upsert)
+ * Set a working memory value (upsert) in thread metadata
  */
 export async function setWorkingMemory(
   userId: string,
@@ -94,13 +67,55 @@ export async function setWorkingMemory(
   key: string,
   value: any
 ): Promise<void> {
-  await query(
-    `INSERT INTO working_memory (user_id, thread_id, key, value)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (user_id, thread_id, key)
-     DO UPDATE SET value = $4, updated_at = NOW()`,
-    [userId, threadId, key, JSON.stringify(value)]
-  )
+  await ensureStorageInitialized()
+
+  // Get current thread
+  const thread = await storage.getThreadById({ threadId })
+  if (!thread) {
+    throw new Error(`Thread ${threadId} not found`)
+  }
+
+  // Get current working memory state
+  const currentState = await getWorkingMemory(userId, threadId)
+
+  // Update the specific key in working memory state
+  const updatedState: WorkingMemoryState = { ...currentState }
+  
+  switch (key) {
+    case 'findings':
+      updatedState.findings = value
+      break
+    case 'insights':
+      updatedState.insights = value
+      break
+    case 'decisions':
+      updatedState.decisions = value
+      break
+    case 'processedUrls':
+      updatedState.processedUrls = value
+      break
+    case 'completedQueries':
+      updatedState.completedQueries = value
+      break
+    case 'followUpQuestions':
+      updatedState.followUpQuestions = value
+      break
+    case 'phase':
+      updatedState.phase = value
+      break
+    default:
+      updatedState.customData[key] = value
+  }
+
+  // Update thread metadata with new working memory state
+  await storage.updateThread({
+    id: threadId,
+    title: thread.title,
+    metadata: {
+      ...thread.metadata,
+      workingMemory: updatedState,
+    },
+  })
 }
 
 /**
@@ -222,20 +237,44 @@ export async function clearWorkingMemory(
   userId: string,
   threadId: string
 ): Promise<void> {
-  await query(
-    `DELETE FROM working_memory WHERE user_id = $1 AND thread_id = $2`,
-    [userId, threadId]
-  )
+  await ensureStorageInitialized()
+
+  const thread = await storage.getThreadById({ threadId })
+  if (!thread) {
+    return // Thread doesn't exist, nothing to clear
+  }
+
+  // Remove working memory from metadata
+  const metadata = { ...thread.metadata }
+  delete metadata.workingMemory
+
+  await storage.updateThread({
+    id: threadId,
+    title: thread.title,
+    metadata,
+  })
 }
 
 /**
- * Clear all working memory for a user
+ * Clear all working memory for a user (all threads)
  */
 export async function clearAllUserWorkingMemory(userId: string): Promise<void> {
-  await query(
-    `DELETE FROM working_memory WHERE user_id = $1`,
-    [userId]
-  )
+  await ensureStorageInitialized()
+
+  // Get all threads for the user
+  const threads = await storage.getThreadsByResourceId({ resourceId: userId })
+
+  // Clear working memory from each thread
+  for (const thread of threads) {
+    const metadata = { ...thread.metadata }
+    delete metadata.workingMemory
+
+    await storage.updateThread({
+      id: thread.id,
+      title: thread.title,
+      metadata,
+    })
+  }
 }
 
 /**
