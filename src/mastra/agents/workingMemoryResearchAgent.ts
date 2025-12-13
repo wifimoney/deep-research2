@@ -1,7 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { webSearchTool } from '../tools/webSearchTool';
 import { httpFetchTool } from '../tools/httpFetchTool';
-import { researchMemory } from '../config/memory';
+import { standardMemory } from '../config/memory';
 import { modelConfig } from '../config/config.js';
 
 /**
@@ -131,5 +131,5 @@ Final Output:
     httpFetchTool,
   },
   // Conversation history: recalls past research context and findings across sessions
-  memory: researchMemory,
+  memory: standardMemory,
 });

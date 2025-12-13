@@ -44,11 +44,8 @@ export const mastra = new Mastra({
     researchWorkflow,
     breachReportWorkflow,
   },
-  observability: {
-    default: {
-      enabled: true, // Enabled for Mastra Studio - traces will appear automatically
-    },
-  },
+  // Observability disabled - OpenTelemetry causes memory crashes with large payloads
+  // TODO: Re-enable when Mastra adds payload truncation/limits to trace exporters
 });
 
 // Initialize RAG collections at startup

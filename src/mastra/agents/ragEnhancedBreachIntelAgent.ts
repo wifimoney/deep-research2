@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { modelConfig } from '../config/config.js';
 import { findSimilarThreatsTool, retrieveBreachIntelTool } from '../tools/ragTools';
 import { httpFetchTool } from '../tools/httpFetchTool';
-import { analysisMemory } from '../config/memory';
+import { standardMemory } from '../config/memory';
 
 export const ragEnhancedBreachIntelAgent = new Agent({
   id: 'rag-breach-intel-agent',
@@ -34,5 +34,5 @@ Be explicit when context is retrieved from RAG and when assumptions are made.`,
     findSimilarThreatsTool,
   },
   // Semantic recall enabled: recalls similar threat analyses from past conversations
-  memory: analysisMemory,
+  memory: standardMemory,
 });

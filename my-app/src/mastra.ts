@@ -11,7 +11,8 @@ export const mastra = new Mastra({
   agents: {
     chatAgent,
   },
-  // Observability is enabled automatically when running 'mastra dev'
+  // Observability disabled - OpenTelemetry causes memory crashes with large payloads
+  // TODO: Re-enable when Mastra adds payload truncation/limits to trace exporters
 });
 
 // Re-export memory and storage instances for use in services

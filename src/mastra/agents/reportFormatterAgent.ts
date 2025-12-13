@@ -5,7 +5,7 @@ import {
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from '../tools/ragTools';
-import { analysisMemory } from '../config/memory';
+import { standardMemory } from '../config/memory';
 
 export const reportFormatterAgent = new Agent({
   id: 'report-formatter-agent',
@@ -57,5 +57,5 @@ Your report will drive security decisions and resource allocation. Be precise, b
     findSimilarThreatsTool,
   },
   // Semantic recall enabled: recalls previous report formats and security context
-  memory: analysisMemory,
+  memory: standardMemory,
 });

@@ -6,7 +6,7 @@ import {
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from '../tools/ragTools';
-import { researchMemory } from '../config/memory';
+import { standardMemory } from '../config/memory';
 import { modelConfig } from '../config/config.js';
 
 export const webResearcherAgent = new Agent({
@@ -213,5 +213,5 @@ Your research output will feed directly into intelligence analysis, so accuracy 
     findSimilarThreatsTool,
   },
   // Semantic recall enabled: recalls past research context and findings across sessions
-  memory: researchMemory,
+  memory: standardMemory,
 });

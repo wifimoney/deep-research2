@@ -5,7 +5,7 @@ import {
   retrieveBreachIntelTool,
   findSimilarThreatsTool,
 } from '../tools/ragTools';
-import { analysisMemory } from '../config/memory';
+import { standardMemory } from '../config/memory';
 import { modelConfig } from '../config/config.js';
 
 export const breachIntelAgent = new Agent({
@@ -86,5 +86,5 @@ Analyze breaches, hacks, and CVEs. Query RAG for similar incidents. Output a com
     findSimilarThreatsTool,
   },
   // Semantic recall enabled: recalls similar security incidents from past conversations
-  memory: analysisMemory,
+  memory: standardMemory,
 });

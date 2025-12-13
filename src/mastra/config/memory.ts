@@ -165,30 +165,18 @@ export const standardMemory = createMemory({
 });
 
 /**
- * Memory optimized for research agents with broader recall
+ * Memory optimized for research agents
+ * Standardized: Uses standardMemory for consistency
  * Best for: Research agents that need to recall information across sessions
  */
-export const researchMemory = createMemory({
-  lastMessages: 15, // Reduced from 30 to prevent memory issues with large research tasks
-  semanticRecall: {
-    topK: 3, // Reduced from 5
-    messageRange: 2, // Reduced from 3
-    scope: 'resource',
-  },
-});
+export const researchMemory = standardMemory;
 
 /**
  * Memory optimized for analysis agents (security, breach intel)
+ * Standardized: Uses standardMemory for consistency
  * Best for: Agents that need deep context about specific incidents
  */
-export const analysisMemory = createMemory({
-  lastMessages: 25,
-  semanticRecall: {
-    topK: 4,
-    messageRange: 2,
-    scope: 'resource',
-  },
-});
+export const analysisMemory = standardMemory;
 
 /**
  * Lightweight memory without semantic recall

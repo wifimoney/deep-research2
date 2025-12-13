@@ -1,4 +1,4 @@
-import { query } from '../db/postgres.js'
+import { query } from '../../../src/db/postgres.js'
 import { hashPassword, generateSessionId, getSessionExpiry } from '../utils/auth.js'
 
 // User type

@@ -1,9 +1,19 @@
+/**
+ * PostgreSQL Client
+ * 
+ * Single source of truth for raw PostgreSQL queries.
+ * Used by user/session management (not Mastra storage).
+ * 
+ * Note: Mastra storage uses PostgresStore from @mastra/pg (see config/storage.ts)
+ * This pool is for application-level queries (users, sessions, etc.)
+ */
+
 import pg from 'pg'
 import { config } from 'dotenv'
 import { resolve } from 'path'
-import { databaseConfig } from '../../../src/mastra/config/config.js'
+import { databaseConfig } from '../mastra/config/config.js'
 
-// Load .env file explicitly from the my-app directory
+// Load .env file
 config({ path: resolve(process.cwd(), '.env') })
 
 const { Pool } = pg
@@ -55,3 +65,4 @@ export async function closePool() {
 }
 
 export default pool
+

@@ -49,6 +49,9 @@ const researchStep = createStep({
   execute: async ({ inputData, mastra }) => {
     const { query } = inputData;
 
+    // Generate threadId for this research session (required for working memory)
+    const threadId = `research-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
     try {
       const agent = mastra.getAgent('researchAgent');
       const researchPrompt = `Research the following topic thoroughly using the two-phase process: "${query}".
@@ -67,6 +70,8 @@ const researchStep = createStep({
         ],
         {
           maxSteps: 15,
+          threadId,              // Required for working memory tools
+          resourceId: 'workflow', // Required for working memory tools
           structuredOutput: {
             schema: z.object({
               queries: z.array(z.string()),

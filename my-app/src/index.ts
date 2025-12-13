@@ -7,7 +7,7 @@ import authRoutes from './routes/auth.js'
 import apiRoutes from './routes/api.js'
 import { requireAuth } from './middleware/auth.js'
 import { renderDashboard } from './views/auth.js'
-import { closePool } from './db/postgres.js'
+import { closePool } from '../../src/db/postgres.js'
 import { serverConfig } from '../../src/mastra/config/config.js'
 
 const app = new Hono()
