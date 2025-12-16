@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "sentry:verify": "tsx scripts/sentry-verify.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.87",
@@ -20,16 +21,19 @@
     "@mastra/libsql": "1.0.0-beta.7",
     "@mastra/memory": "1.0.0-beta.4",
     "@mastra/pg": "1.0.0-beta.7",
-    "@openrouter/ai-sdk-provider": "^0.4.3",
+    "@openrouter/ai-sdk-provider": "^1.2.3",
     "@sentry/node": "^10.31.0",
-    "ai": "^4.3.19",
+    "ai": "^5.0.0",
     "bcrypt": "^5.1.1",
     "better-auth": "^1.4.7",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.10.8",
+    "in": "^0.19.0",
+    "my-app": "link:my-app",
     "pg": "^8.13.1",
     "postgres": "^3.4.7",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
