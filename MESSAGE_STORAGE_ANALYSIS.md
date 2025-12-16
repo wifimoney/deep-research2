@@ -9,7 +9,7 @@ This document explains how messages are saved, their format, and how they are re
 
 ### Primary Method: `Memory.saveMessages()`
 
-Messages are saved using Mastra's `Memory.saveMessages()` API in `chatService.ts` (lines 233-254):
+Messages are saved using Mastra's `Memory.saveMessages()` API in `memoryService.ts` (see `sendMessage()` function):
 
 ```typescript
 await chatMemory.saveMessages({
@@ -268,10 +268,11 @@ const memory = new Memory({
 
 ## 7. Key Files
 
-- **`my-app/src/services/chatService.ts`** - Main chat service implementation
-  - `sendMessage()` - Saves messages (line 233)
-  - `getHistory()` - Retrieves messages (line 412)
-  - `extractTextContent()` - Content format extraction (line 284)
+- **`my-app/src/services/memoryService.ts`** - Main memory service implementation
+  - `sendMessage()` - Saves messages using Mastra Memory API
+  - `getHistory()` - Retrieves messages with semantic recall
+  - `getThreads()` - Lists conversation threads
+  - `createThread()` - Creates new conversation threads
 
 - **`src/mastra/config/memory.ts`** - Memory configuration and helper functions
 

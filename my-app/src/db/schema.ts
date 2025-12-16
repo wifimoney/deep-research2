@@ -88,3 +88,25 @@ export const verification = pgTable("verification", {
     mode: "date",
   }).notNull().defaultNow(),
 });
+
+// Note: These tables reference Mastra's actual tables (mastra_threads, mastra_messages)
+// Mastra auto-creates and manages these tables, so we map to them here
+// Column names match Mastra's actual schema (mix of camelCase and snake_case)
+export const memoryThreads = pgTable("mastra_threads", {
+  id: text("id").primaryKey(),
+  resourceId: text("resourceId").notNull(), // Mastra uses camelCase: resourceId
+  title: text("title"),
+  metadata: text("metadata"), // JSON string stored as text
+  createdAt: timestamp("createdAtZ", { withTimezone: true, mode: "date" }), // Mastra uses createdAtZ for timezone-aware
+  updatedAt: timestamp("updatedAtZ", { withTimezone: true, mode: "date" }), // Mastra uses updatedAtZ for timezone-aware
+});
+
+export const memoryMessages = pgTable("mastra_messages", {
+  id: text("id").primaryKey(),
+  threadId: text("thread_id").notNull(), // Mastra uses snake_case: thread_id
+  role: text("role").notNull(), // user, assistant, system
+  content: text("content").notNull(),
+  userId: text("resourceId"), // Map to Mastra's resourceId column (user context)
+  createdAt: timestamp("createdAtZ", { withTimezone: true, mode: "date" }), // Mastra uses createdAtZ for timezone-aware
+  // Note: Mastra's table also has: type, embedding, metadata columns, but we don't need them for our queries
+});

@@ -18,11 +18,11 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.3.24",
-    "@mastra/core": "0.24.8",
-    "@mastra/libsql": "^0.16.4",
-    "@mastra/loggers": "^0.10.19",
-    "@mastra/memory": "^0.15.13",
-    "@mastra/pg": "^0.17.10",
+    "@mastra/core": "1.0.0-beta.11",
+    "@mastra/libsql": "1.0.0-beta.7",
+    "@mastra/loggers": "1.0.0-beta.3",
+    "@mastra/memory": "1.0.0-beta.4",
+    "@mastra/pg": "1.0.0-beta.7",
     "ai": "^4.3.19",
     "better-auth": "^1.4.7",
     "dotenv": "^17.2.3",
@@ -35,7 +35,7 @@
     "@types/node": "^24.0.3",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
-    "mastra": "^0.18.8",
+    "mastra": "1.0.0-beta.9",
     "tsx": "^4.21.0",
     "typescript": "^5.8.3"
   }

@@ -281,6 +281,89 @@ const dashboardStyles = `
     font-size: 14px;
     line-height: 1.5;
   }
+  .message-content.markdown-body {
+    word-wrap: break-word;
+  }
+  .message-content.markdown-body p {
+    margin: 0.5em 0;
+  }
+  .message-content.markdown-body p:first-child {
+    margin-top: 0;
+  }
+  .message-content.markdown-body p:last-child {
+    margin-bottom: 0;
+  }
+  .message-content.markdown-body code {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+  }
+  .message-content.markdown-body pre {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0.5em 0;
+  }
+  .message-content.markdown-body pre code {
+    background: none;
+    padding: 0;
+  }
+  .message-content.markdown-body ul,
+  .message-content.markdown-body ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+  }
+  .message-content.markdown-body li {
+    margin: 0.25em 0;
+  }
+  .message-content.markdown-body h1,
+  .message-content.markdown-body h2,
+  .message-content.markdown-body h3,
+  .message-content.markdown-body h4,
+  .message-content.markdown-body h5,
+  .message-content.markdown-body h6 {
+    margin: 0.75em 0 0.5em 0;
+    font-weight: 600;
+  }
+  .message-content.markdown-body h1:first-child,
+  .message-content.markdown-body h2:first-child,
+  .message-content.markdown-body h3:first-child,
+  .message-content.markdown-body h4:first-child,
+  .message-content.markdown-body h5:first-child,
+  .message-content.markdown-body h6:first-child {
+    margin-top: 0;
+  }
+  .message-content.markdown-body blockquote {
+    border-left: 3px solid rgba(0, 0, 0, 0.2);
+    padding-left: 12px;
+    margin: 0.5em 0;
+    font-style: italic;
+  }
+  .message-content.markdown-body table {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    width: 100%;
+  }
+  .message-content.markdown-body th,
+  .message-content.markdown-body td {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 6px 12px;
+    text-align: left;
+  }
+  .message-content.markdown-body th {
+    background: rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+  }
+  .message-content.markdown-body a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .message.user .message-content.markdown-body a {
+    color: rgba(255, 255, 255, 0.9);
+  }
   .message.user .message-content {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -862,12 +945,26 @@ export function renderDashboard(username: string, email: string) {
         </main>
       </div>
 
+      <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
       <script>
         // State
         let currentThreadId = null;
         let threads = [];
         let isLoading = false;
         let currentThreadHasMessages = false; // Track if current thread has any messages
+        let isLoadingThreads = false; // Prevent concurrent thread loads
+        let isLoadingMessages = false; // Prevent concurrent message loads
+        let hasCheckedSession = false; // Prevent multiple session checks
+        let isInitialized = false; // Track if initial load is complete
+        
+        // Configure marked for safe rendering
+        if (typeof marked !== 'undefined') {
+          marked.setOptions({
+            breaks: true, // Convert line breaks to <br>
+            gfm: true, // GitHub Flavored Markdown
+            sanitize: false, // We'll sanitize manually
+          });
+        }
 
         // DOM Elements
         const threadList = document.getElementById('threadList');
@@ -908,11 +1005,21 @@ export function renderDashboard(username: string, email: string) {
           }
         });
 
-        // Load threads on page load
-        loadThreads();
+        // Load threads on page load (only once)
+        if (!isInitialized) {
+          loadThreads();
+        }
 
         // Load threads from API
         async function loadThreads() {
+          // Prevent concurrent calls
+          if (isLoadingThreads) {
+            console.log('[Frontend] loadThreads() already in progress, skipping...');
+            return;
+          }
+          
+          isLoadingThreads = true;
+          
           try {
             console.log('[Frontend] Loading threads...');
             const response = await fetch('/api/chat/threads', { credentials: 'include' });
@@ -925,18 +1032,25 @@ export function renderDashboard(username: string, email: string) {
               console.log('[Frontend] Loaded ' + threads.length + ' threads');
               renderThreadList();
               
-              // If there are threads, select the most recent one
-              if (threads.length > 0 && !currentThreadId) {
+              // If there are threads and we haven't initialized yet, select the most recent one
+              if (threads.length > 0 && !currentThreadId && !isInitialized) {
                 console.log('[Frontend] Selecting most recent thread: ' + threads[0].id);
-                selectThread(threads[0].id);
+                isInitialized = true; // Mark as initialized before selecting
+                await selectThread(threads[0].id);
+              } else {
+                isInitialized = true; // Mark as initialized even if no threads
               }
             } else {
               console.error('[Frontend] Failed to load threads:', data.error);
               threadList.innerHTML = '<div class="no-threads">Failed to load conversations</div>';
+              isInitialized = true; // Mark as initialized even on error
             }
           } catch (err) {
             console.error('[Frontend] Failed to load threads:', err);
             threadList.innerHTML = '<div class="no-threads">Error loading conversations</div>';
+            isInitialized = true; // Mark as initialized even on error
+          } finally {
+            isLoadingThreads = false;
           }
         }
 
@@ -965,23 +1079,44 @@ export function renderDashboard(username: string, email: string) {
 
         // Load messages for a thread
         async function loadMessages(threadId) {
+          // Prevent concurrent calls for the same thread
+          if (isLoadingMessages) {
+            console.log('[Frontend] loadMessages() already in progress, skipping...');
+            return;
+          }
+          
+          // If already loading messages for this thread, skip
+          if (currentThreadId === threadId && isLoadingMessages) {
+            return;
+          }
+          
+          isLoadingMessages = true;
+          
           try {
             messagesList.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
             
             const response = await fetch(\`/api/chat/history?threadId=\${threadId}\`, { credentials: 'include' });
             const data = await response.json();
             
-            if (data.success) {
-              currentThreadHasMessages = data.messages && data.messages.length > 0;
-              renderMessages(data.messages);
-            } else {
-              currentThreadHasMessages = false;
-              renderEmptyChat();
+            // Only update if this is still the current thread (prevent race conditions)
+            if (currentThreadId === threadId) {
+              if (data.success) {
+                currentThreadHasMessages = data.messages && data.messages.length > 0;
+                renderMessages(data.messages);
+              } else {
+                currentThreadHasMessages = false;
+                renderEmptyChat();
+              }
             }
           } catch (err) {
             console.error('Failed to load messages:', err);
-            currentThreadHasMessages = false;
-            renderEmptyChat();
+            // Only update if this is still the current thread
+            if (currentThreadId === threadId) {
+              currentThreadHasMessages = false;
+              renderEmptyChat();
+            }
+          } finally {
+            isLoadingMessages = false;
           }
         }
 
@@ -992,12 +1127,19 @@ export function renderDashboard(username: string, email: string) {
             return;
           }
 
-          messagesList.innerHTML = messages.map(msg => \`
-            <div class="message \${msg.role}">
-              <div class="message-avatar">\${msg.role === 'user' ? '👤' : '🤖'}</div>
-              <div class="message-content">\${escapeHtml(msg.content)}</div>
-            </div>
-          \`).join('');
+          messagesList.innerHTML = messages.map(msg => {
+            // Render markdown for assistant messages, plain text for user messages
+            const content = msg.role === 'assistant' 
+              ? renderMarkdown(msg.content)
+              : escapeHtml(msg.content);
+            
+            return \`
+              <div class="message \${msg.role}">
+                <div class="message-avatar">\${msg.role === 'user' ? '👤' : '🤖'}</div>
+                <div class="message-content markdown-body">\${content}</div>
+              </div>
+            \`;
+          }).join('');
 
           scrollToBottom();
         }
@@ -1033,11 +1175,17 @@ export function renderDashboard(username: string, email: string) {
             const data = await response.json();
             
             if (data.success) {
-              // Refresh the full thread list to ensure we have the latest data
-              await loadThreads();
-              // Set the newly created thread as current
+              // Set the newly created thread as current first
               currentThreadId = data.thread.id;
               currentThreadHasMessages = false; // New thread has no messages
+              
+              // Refresh the full thread list to ensure we have the latest data
+              // But don't auto-select since we already have a thread selected
+              const wasInitialized = isInitialized;
+              isInitialized = true; // Prevent auto-selection
+              await loadThreads();
+              isInitialized = wasInitialized; // Restore state
+              
               renderThreadList();
               renderEmptyChat();
               chatInput.focus();
@@ -1108,11 +1256,11 @@ export function renderDashboard(username: string, email: string) {
               // Mark that this thread now has messages
               currentThreadHasMessages = true;
 
-              // Add assistant response
+              // Add assistant response (render as markdown)
               messagesList.innerHTML += \`
                 <div class="message assistant">
                   <div class="message-avatar">🤖</div>
-                  <div class="message-content">\${escapeHtml(data.assistantMessage.content)}</div>
+                  <div class="message-content markdown-body">\${renderMarkdown(data.assistantMessage.content)}</div>
                 </div>
               \`;
               scrollToBottom();
@@ -1124,12 +1272,12 @@ export function renderDashboard(username: string, email: string) {
                 renderThreadList();
               }
             } else {
-              // Show error with actual error message from API
+              // Show error with actual error message from API (render as markdown)
               const errorMsg = data.error || 'Sorry, something went wrong. Please try again.';
               messagesList.innerHTML += \`
                 <div class="message assistant">
                   <div class="message-avatar">❌</div>
-                  <div class="message-content">\${escapeHtml(errorMsg)}</div>
+                  <div class="message-content markdown-body">\${renderMarkdown(errorMsg)}</div>
                 </div>
               \`;
             }
@@ -1141,7 +1289,7 @@ export function renderDashboard(username: string, email: string) {
             messagesList.innerHTML += \`
               <div class="message assistant">
                 <div class="message-avatar">❌</div>
-                <div class="message-content">Network error. Please try again.</div>
+                <div class="message-content markdown-body">\${renderMarkdown('Network error. Please try again.')}</div>
               </div>
             \`;
           } finally {
@@ -1162,6 +1310,45 @@ export function renderDashboard(username: string, email: string) {
           const div = document.createElement('div');
           div.textContent = text;
           return div.innerHTML;
+        }
+        
+        // Render markdown safely (sanitizes HTML)
+        function renderMarkdown(text) {
+          if (!text) return '';
+          
+          // Use marked if available, otherwise escape HTML
+          if (typeof marked !== 'undefined') {
+            try {
+              // Sanitize the markdown output to prevent XSS
+              const html = marked.parse(text);
+              // Basic sanitization - remove script tags and dangerous attributes
+              const div = document.createElement('div');
+              div.innerHTML = html;
+              
+              // Remove script tags and dangerous event handlers
+              const scripts = div.querySelectorAll('script');
+              scripts.forEach(script => script.remove());
+              
+              // Remove dangerous attributes
+              const allElements = div.querySelectorAll('*');
+              allElements.forEach(el => {
+                // Remove event handlers
+                Array.from(el.attributes).forEach(attr => {
+                  if (attr.name.startsWith('on')) {
+                    el.removeAttribute(attr.name);
+                  }
+                });
+              });
+              
+              return div.innerHTML;
+            } catch (e) {
+              console.error('Markdown rendering error:', e);
+              return escapeHtml(text);
+            }
+          } else {
+            // Fallback to escaped HTML if marked is not loaded
+            return escapeHtml(text);
+          }
         }
 
         // Handle logout
@@ -1185,16 +1372,42 @@ export function renderDashboard(username: string, email: string) {
           }
         });
 
-        // Verify session is still valid
+        // Verify session is still valid (only once, with delay to avoid race conditions)
         (async () => {
+          // Prevent multiple session checks
+          if (hasCheckedSession) {
+            return;
+          }
+          
+          // Small delay to let initial page load complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          hasCheckedSession = true;
+          
           try {
             const response = await fetch('/api/me', { credentials: 'include' });
+            
+            if (response.status === 401 || response.status === 403) {
+               console.warn('[Frontend] Session check returned 401/403');
+               localStorage.removeItem('user');
+               window.location.href = '/auth/login';
+               return;
+            }
+
             const data = await response.json();
             if (!data.authenticated) {
+              console.warn('[Frontend] Session check returned authenticated: false');
+              // Only redirect if we are sure (maybe user just logged out in another tab)
+              // But if we encounter a temporary glitch, do not redirect immediately?
+              // For now, we trust the API.
               localStorage.removeItem('user');
               window.location.href = '/auth/login';
             }
-          } catch (e) {}
+          } catch (e) {
+            // Don't redirect on network errors - might be temporary
+            console.error('[Frontend] Session check failed:', e);
+            hasCheckedSession = false; // Allow retry on error
+          }
         })();
       </script>
     </body>

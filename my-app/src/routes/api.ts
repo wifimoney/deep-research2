@@ -9,6 +9,10 @@ import {
   getSessionWithUser,
 } from '../services/userService.js'
 import { verifyPassword, SESSION_COOKIE_OPTIONS } from '../utils/auth.js'
+import { getSession as getBetterAuthSession } from '../auth/index.js'
+import { db } from '../db/drizzle.js'
+import { users } from '../db/schema.js'
+import { eq } from 'drizzle-orm'
 import {
   sendMessage,
   getHistory,
@@ -143,25 +147,19 @@ api.post('/logout', async (c) => {
 
 // GET /api/me - Get current user
 api.get('/me', async (c) => {
-  const sessionId = getCookie(c, 'session_id')
-
-  if (!sessionId) {
-    return c.json({ authenticated: false, user: null })
-  }
-
   try {
-    const session = await getSessionWithUser(sessionId)
+    const user = await getAuthenticatedUser(c)
 
-    if (!session) {
+    if (!user) {
       return c.json({ authenticated: false, user: null })
     }
 
     return c.json({
       authenticated: true,
       user: {
-        id: session.user_id,
-        username: session.username,
-        email: session.email,
+        id: user.id,
+        username: user.username,
+        email: user.email,
       },
     })
   } catch (error) {
@@ -174,8 +172,38 @@ api.get('/me', async (c) => {
 // Chat API Endpoints
 // ============================================================================
 
-// Helper to get authenticated user from session
+/**
+ * Helper to get authenticated user from session
+ * Checks both Better Auth sessions (OAuth) and legacy sessions (email/password)
+ */
 async function getAuthenticatedUser(c: any) {
+  // First check Better Auth session (for OAuth users like Google)
+  try {
+    const betterAuthSession = await getBetterAuthSession(c.req.raw)
+    if (betterAuthSession?.user) {
+      const userId = betterAuthSession.session?.userId || betterAuthSession.user?.id
+      if (userId) {
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, userId),
+        })
+        if (user) {
+          // Use name from Better Auth if available, then database name, then username, then derive from email
+          const username = betterAuthSession.user.name || user.name || user.username || user.email?.split('@')[0] || 'User'
+
+          return {
+            id: user.id,
+            username,
+            email: user.email || betterAuthSession.user.email || '',
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Better Auth session check failed, fall through to legacy session check
+    console.error('Better Auth session check error in getAuthenticatedUser:', error)
+  }
+
+  // Fallback to legacy session check (for email/password users)
   const sessionId = getCookie(c, 'session_id')
   if (!sessionId) return null
 
@@ -197,10 +225,16 @@ api.post('/chat', async (c) => {
       return c.json({ success: false, error: 'Not authenticated' }, 401)
     }
 
-    const { threadId, message } = await c.req.json()
+    const body = await c.req.json()
+    let { threadId, message } = body
 
-    if (!threadId || !message) {
-      return c.json({ success: false, error: 'threadId and message are required' }, 400)
+    if (!message) {
+      return c.json({ success: false, error: 'message is required' }, 400)
+    }
+
+    // Generate threadId if not provided (User Requirement 3)
+    if (!threadId) {
+      threadId = `thread-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     }
 
     const result = await sendMessage(user.id, threadId, message)
@@ -209,6 +243,7 @@ api.post('/chat', async (c) => {
       success: true,
       userMessage: result.userMessage,
       assistantMessage: result.assistantMessage,
+      threadId: result.threadId, // Ensure frontend gets the ID back
     })
   } catch (error) {
     console.error('Chat error:', error)
@@ -234,11 +269,15 @@ api.get('/chat/history', async (c) => {
 
     return c.json({
       success: true,
-      messages,
+      messages: messages || [], // Ensure we always return an array
     })
   } catch (error) {
     console.error('Get history error:', error)
-    return c.json({ success: false, error: 'Failed to get history' }, 500)
+    // Fix infinite loop: Return empty array instead of error (User Requirement 6)
+    return c.json({
+      success: true,
+      messages: []
+    })
   }
 })
 

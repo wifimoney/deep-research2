@@ -1,5 +1,6 @@
 import { Memory } from '@mastra/memory';
 import { ModelRouterEmbeddingModel } from '@mastra/core/llm';
+import { z } from 'zod';
 import { storage as memoryStorage, vector as memoryVector } from './storage.js';
 
 // Re-export ensureStorageInitialized for convenience (used by services)
@@ -137,18 +138,71 @@ export function createMemory(config: MemoryConfig = {}): Memory {
     };
   }
 
-  return new Memory({
-    storage: memoryStorage,
-    vector: memoryVector,
-    embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
-    options: {
-      lastMessages,
-      semanticRecall: semanticRecallOptions,
-      workingMemory: {
-        enabled: true,
-      },
-    },
+  // Define working memory schema that matches WorkingMemoryState interface
+  // This schema is used by Mastra to generate working memory tools
+  const workingMemorySchema = z.object({
+    findings: z.array(z.object({
+      finding: z.string(),
+      source: z.string(),
+      relevance: z.string(),
+    })).optional(),
+    insights: z.array(z.string()).optional(),
+    decisions: z.array(z.object({
+      decision: z.string(),
+      reasoning: z.string(),
+    })).optional(),
+    processedUrls: z.array(z.string()).optional(),
+    completedQueries: z.array(z.string()).optional(),
+    followUpQuestions: z.array(z.string()).optional(),
+    phase: z.enum(['initial', 'follow-up', 'analysis', 'complete']).optional(),
+    customData: z.record(z.any()).optional(),
   });
+
+  // Approach 1: Try providing schema in workingMemory config (causes Zod v4 compatibility issues)
+  // Approach 2: Use 'tools: false' to disable auto-tool generation (default - works reliably)
+  // 
+  // Note: Approach 1 causes "Cannot read properties of undefined (reading 'def')" error
+  // with Zod v4 when Mastra tries to convert schema to JSON schema format.
+  // Approach 2 keeps working memory enabled but disables automatic tool generation,
+  // allowing manual working memory management via workingMemoryService.
+  
+  // Set USE_WORKING_MEMORY_TOOLS=true in .env to try schema-based approach (may fail with Zod v4)
+  const useWorkingMemoryTools = process.env.USE_WORKING_MEMORY_TOOLS === 'true';
+  
+  if (useWorkingMemoryTools) {
+    // Approach 1: Try with schema (may fail with Zod v4 compatibility issues)
+    console.log('[Memory] Using working memory with schema (auto-tools enabled - may fail with Zod v4)');
+    return new Memory({
+      storage: memoryStorage,
+      vector: memoryVector,
+      embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
+      options: {
+        lastMessages,
+        semanticRecall: semanticRecallOptions,
+        workingMemory: {
+          enabled: true,
+          schema: workingMemorySchema,  // May cause Zod v4 compatibility issues
+        },
+      },
+    });
+  } else {
+    // Approach 2: Disable working memory entirely to avoid Zod v4 compatibility issues
+    // Manual working memory management is handled via workingMemoryService
+    // This prevents Mastra from trying to generate tools from the schema
+    console.log('[Memory] Using working memory disabled (manual management via workingMemoryService - recommended for Zod v4)');
+    return new Memory({
+      storage: memoryStorage,
+      vector: memoryVector,
+      embedder: new ModelRouterEmbeddingModel('openai/text-embedding-3-small'),
+      options: {
+        lastMessages,
+        semanticRecall: semanticRecallOptions,
+        workingMemory: {
+          enabled: false,  // Completely disable to avoid Zod v4 schema conversion issues
+        },
+      },
+    });
+  }
 }
 
 /**

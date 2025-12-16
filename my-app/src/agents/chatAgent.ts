@@ -1,6 +1,8 @@
 import { Agent } from '@mastra/core/agent';
 import { standardMemory as memory } from '../../../src/mastra/config/memory.js';
 import { openrouter } from '@openrouter/ai-sdk-provider';
+import { openai } from '@ai-sdk/openai';
+import { apiKeysConfig } from '../../../src/mastra/config/config.js';
 
 /**
  * Chat Agent with Memory and Semantic Recall
@@ -54,6 +56,32 @@ If a user asks "What was that restaurant we talked about?" and semantic recall f
 "I believe we discussed [restaurant name] in a previous conversation. [Details from recalled message]"
 
 The system handles finding the relevant past messages automatically - you just respond naturally using the context provided.`,
-  model: openrouter('openai/gpt-4o-mini'),
+  // Use OpenRouter if API key is available, otherwise use OpenAI directly
+  model: (() => {
+    // Log configuration at startup
+    console.log('[ChatAgent] Initializing model provider...');
+    console.log('[ChatAgent] OpenRouter key available:', !!apiKeysConfig.openrouter);
+    console.log('[ChatAgent] OpenAI key available:', !!apiKeysConfig.openai);
+    
+    if (apiKeysConfig.openrouter) {
+      console.log('[ChatAgent] ✅ Using OpenRouter provider');
+      return openrouter('openai/gpt-4o-mini', {
+        apiKey: apiKeysConfig.openrouter,
+      });
+    } else if (apiKeysConfig.openai) {
+      console.log('[ChatAgent] ✅ Using OpenAI provider');
+      const openaiKey = apiKeysConfig.openai;
+      // Verify key format
+      if (!openaiKey.startsWith('sk-')) {
+        console.warn('[ChatAgent] ⚠️  Warning: OpenAI API key does not start with "sk-"');
+      }
+      return openai('gpt-4o-mini', {
+        apiKey: openaiKey,
+      });
+    } else {
+      console.error('[ChatAgent] ❌ No API key configured');
+      throw new Error('No API key configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.');
+    }
+  })(),
   memory: memory,
 });

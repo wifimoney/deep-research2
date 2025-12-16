@@ -14,6 +14,9 @@ import { storage, ensureStorageInitialized } from '../../../src/mastra/config/st
 import { getWorkingMemorySummary } from './workingMemoryService.js'
 import { apiKeysConfig } from '../../../src/mastra/config/config.js'
 
+// Re-export storage for direct access in getThreads
+export { storage }
+
 /**
  * Message type for API responses
  */
@@ -53,19 +56,31 @@ function extractTextContent(msg: any): string {
   if (typeof msg === 'string') {
     return msg
   }
-  
+
   // Try msg.text first (some storage formats)
   if (msg.text && typeof msg.text === 'string') {
     return msg.text
   }
-  
-  const content = msg.content
-  
+
+  let content = msg.content
+
   // Case 1: Direct string content
   if (typeof content === 'string') {
+    // Check if it's a JSON string that needs parsing
+    if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(content)
+        if (typeof parsed === 'object') {
+          // Recursively extract from parsed object
+          return extractTextContent({ content: parsed })
+        }
+      } catch (e) {
+        // Not valid JSON, use as-is
+      }
+    }
     return content
   }
-  
+
   // Case 2: Content is null/undefined
   if (content == null) {
     // Try to get content from other fields
@@ -77,12 +92,12 @@ function extractTextContent(msg: any): string {
     }
     return ''
   }
-  
+
   // Case 3: Object with content.content string (our format + Memory format)
   if (typeof content === 'object' && typeof content.content === 'string') {
     return content.content
   }
-  
+
   // Case 4: V2 format with format field (check before generic parts array)
   if (typeof content === 'object' && content.format === 2 && Array.isArray(content.parts)) {
     // Handle empty parts array - return empty string (valid empty message)
@@ -101,7 +116,7 @@ function extractTextContent(msg: any): string {
       .join('')
     return extracted
   }
-  
+
   // Case 5: Object with parts array (generic, without format field)
   if (typeof content === 'object' && Array.isArray(content.parts)) {
     const text = content.parts
@@ -116,7 +131,7 @@ function extractTextContent(msg: any): string {
       .join('')
     if (text) return text
   }
-  
+
   // Case 6: Parts array at top level
   if (Array.isArray(content)) {
     return content
@@ -130,12 +145,12 @@ function extractTextContent(msg: any): string {
       .filter(Boolean)
       .join('')
   }
-  
+
   // Case 7: content.text
   if (typeof content === 'object' && typeof content.text === 'string') {
     return content.text
   }
-  
+
   // Case 8: PostgreSQL storage might store as JSON string
   if (typeof content === 'object' && typeof content.value === 'string') {
     try {
@@ -146,7 +161,7 @@ function extractTextContent(msg: any): string {
       // Not JSON, continue
     }
   }
-  
+
   // Case 9: Check if content has a 'data' field (some storage formats)
   if (typeof content === 'object' && content.data) {
     if (typeof content.data === 'string') return content.data
@@ -161,7 +176,7 @@ function extractTextContent(msg: any): string {
         .join('')
     }
   }
-  
+
   // Fallback: try to stringify, but avoid circular references
   if (typeof content === 'object') {
     try {
@@ -174,7 +189,7 @@ function extractTextContent(msg: any): string {
       // Circular reference or other error
     }
   }
-  
+
   return String(content || '')
 }
 
@@ -202,113 +217,118 @@ export async function sendMessage(
     throw new Error('API key not configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY environment variable in your .env file.')
   }
 
+  // Validate inputs
+  if (!userId) throw new Error('sendMessage: userId is required')
+  if (!threadId) throw new Error('sendMessage: threadId is required')
+  if (!message || message.trim().length === 0) throw new Error('sendMessage: Cannot send empty message')
+
+  console.log(`[MemoryService] sendMessage called for thread ${threadId}, user ${userId}`)
+
   // Ensure storage is initialized
   try {
     await ensureStorageInitialized()
   } catch (error) {
     console.error('[MemoryService] Storage initialization failed:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Storage initialization failed'
-    throw new Error(`Database connection failed: ${errorMessage}`)
+    throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 
-  // Ensure thread exists
+  // Ensure thread exists (both in Mastra and Drizzle)
   try {
     await getOrCreateThread(threadId, userId)
   } catch (error) {
     console.error('[MemoryService] Thread creation failed:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Thread creation failed'
-    throw new Error(`Failed to create or access thread: ${errorMessage}`)
+    throw new Error(`Failed to create or access thread: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 
-  // Validate message is not empty
-  if (!message || message.trim().length === 0) {
-    throw new Error('Cannot send empty message')
+  const now = new Date()
+  const userMsgId = `msg-${Date.now()}-user`
+
+  // 1. Store USER message in Mastra Memory
+  try {
+    console.log(`[MemoryService] Storing USER message in Mastra Memory...`)
+    await (memory as any).storage.saveMessages({
+      messages: [{
+        id: userMsgId,
+        threadId,
+        role: 'user',
+        content: message,
+        createdAt: now,
+        type: 'text'
+      }]
+    })
+    console.log(`[MemoryService] USER message stored in Mastra`)
+  } catch (error) {
+    console.error(`[MemoryService] Failed to store user message in Mastra:`, error)
   }
 
-  // Build the message with optional working memory context
+  // Build enhanced message with working memory
   let enhancedMessage = message
   let workingMemorySummary: string | undefined
 
   if (includeWorkingMemory) {
-    workingMemorySummary = await getWorkingMemorySummary(userId, threadId)
-    if (workingMemorySummary && workingMemorySummary.trim().length > 50) {
-      enhancedMessage = `${workingMemorySummary}\n\n---\n\nUser Message: ${message}`
+    try {
+      workingMemorySummary = await getWorkingMemorySummary(userId, threadId)
+      if (workingMemorySummary && workingMemorySummary.trim().length > 50) {
+        enhancedMessage = `${workingMemorySummary}\n\n---\n\nUser Message: ${message}`
+      }
+    } catch (err) {
+      console.warn('[MemoryService] Failed to get working memory:', err)
     }
   }
 
-  // Verify thread exists and has resourceId before generating
-  const thread = await storage.getThreadById({ threadId })
-  if (!thread || !thread.resourceId) {
-    throw new Error(`Thread ${threadId} not found or missing resourceId. Please ensure thread is created first.`)
-  }
+  // Generate response
+  console.log(`[MemoryService] Generating response...`)
+  let responseText = ''
 
-  console.log(`[MemoryService] Generating response for thread ${threadId}, resource ${userId}`)
-  console.log(`[MemoryService] Using Mastra Memory - messages will be saved automatically with embeddings`)
-
-  // Generate response using the agent with memory context
-  // IMPORTANT: agent.generateLegacy() with threadId and resourceId automatically:
-  // 1. Retrieves conversation history (last 20 messages) via Memory instance
-  // 2. Performs semantic recall to find relevant past messages
-  // 3. Saves both user and assistant messages to memory WITH embeddings
-  // 4. The Memory instance handles all persistence and embedding generation
-  //
-  // The agent's Memory instance is configured with:
-  // - storage: PostgresStore or LibSQLStore for persistence
-  // - vector: PgVector or LibSQLVector for semantic search
-  // - embedder: OpenAI text-embedding-3-small for embeddings
-  // - semanticRecall: enabled with topK=3, messageRange=2, scope='resource'
-  //
-  // Using generateLegacy() because the model is AI SDK v4 compatible
-  let response
   try {
-    response = await chatAgent.generateLegacy(enhancedMessage, {
+    // We use generateLegacy but we ignore its internal storage side-effects since we do it manually
+    // We pass threadId/resourceId just in case it helps retrieval
+    const response = await chatAgent.generateLegacy(enhancedMessage, {
       resourceId: userId,
       threadId: threadId,
     })
+
+    if (!response || !response.text) {
+      throw new Error('AI agent returned an invalid response')
+    }
+
+    responseText = response.text
   } catch (error) {
     console.error(`[MemoryService] Error generating response:`, error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    throw new Error(`Failed to generate AI response: ${errorMessage}`)
+    throw new Error(`Failed to generate AI response: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 
-  if (!response || !response.text) {
-    console.error(`[MemoryService] Invalid response from agent:`, response)
-    throw new Error('AI agent returned an invalid response')
-  }
+  const assistantMsgId = `msg-${Date.now()}-assistant`
+  const assistantCreatedAt = new Date()
 
-  console.log(`[MemoryService] Response generated by agent with Memory instance`)
-
-  // Verify messages were saved by the agent's Memory instance
-  // This confirms that agent.generateLegacy() properly persisted the messages
+  // 2. Store ASSISTANT message in Mastra Memory
   try {
-    const verifyResult = await (memory as any).recall({
-      threadId,
-      resourceId: userId,
-      query: '',
+    console.log(`[MemoryService] Storing ASSISTANT message in Mastra Memory...`)
+    await (memory as any).storage.saveMessages({
+      messages: [{
+        id: assistantMsgId,
+        threadId,
+        role: 'assistant',
+        content: responseText,
+        createdAt: assistantCreatedAt,
+        type: 'text'
+      }]
     })
-    const savedMessages = verifyResult.messages || []
-    console.log(`[MemoryService] Memory verification: ${savedMessages.length} messages found in thread ${threadId}`)
-    
-    if (savedMessages.length === 0) {
-      console.warn(`[MemoryService] WARNING: No messages found after generation. This may indicate agent.generateLegacy() did not save messages.`)
-    }
+    console.log(`[MemoryService] ASSISTANT message stored in Mastra`)
   } catch (error) {
-    console.error(`[MemoryService] Error verifying message persistence:`, error)
+    console.error(`[MemoryService] Failed to store assistant message in Mastra:`, error)
   }
 
   // Update thread timestamp
-  await storage.updateThread({
-    id: threadId,
-    title: thread.title || 'Chat',
-    metadata: thread.metadata || {},
-  })
-
-  const now = new Date()
-  
-  // Generate IDs for the response (these are for the API response, not the stored messages)
-  // The actual messages are saved by the agent's Memory instance with its own IDs
-  const userMsgId = `msg-${Date.now()}-user`
-  const assistantMsgId = `msg-${Date.now()}-assistant`
+  try {
+    await storage.updateThread({
+      id: threadId,
+      title: 'Chat', // We could refine this
+      metadata: {},
+    })
+  } catch (e) {
+    console.warn('[MemoryService] Failed to update thread timestamp:', e)
+  }
 
   return {
     userMessage: {
@@ -320,8 +340,8 @@ export async function sendMessage(
     assistantMessage: {
       id: assistantMsgId,
       role: 'assistant',
-      content: response.text,
-      createdAt: now,
+      content: responseText,
+      createdAt: assistantCreatedAt,
     },
     threadId,
     workingMemorySummary,
@@ -337,67 +357,52 @@ export async function getHistory(
   threadId: string
 ): Promise<Message[]> {
   await ensureStorageInitialized()
-  
+
   console.log(`[MemoryService] getHistory called - threadId: ${threadId}, userId: ${userId}`)
-  
-  try {
-    // Use the shared memory instance's recall method
-    const hasRecall = typeof (memory as any).recall === 'function'
-    console.log(`[MemoryService] Memory.recall available: ${hasRecall}`)
-    
-    if (hasRecall) {
-      try {
-        console.log(`[MemoryService] Using Memory.recall()`)
-        const result = await (memory as any).recall({
-          threadId,
-          resourceId: userId,
-          query: '', // Empty query to get all messages
-        })
-        
+
+  const messagesMap = new Map<string, Message>()
+
+  // 1. Mastra Memory (primary)
+  if (messagesMap.size === 0) {
+    try {
+      const hasRecall = typeof (memory as any).recall === 'function'
+      const hasQuery = typeof (memory as any).query === 'function'
+
+      if (hasRecall || hasQuery) {
+        // Use query/recall logic
+        const result = hasQuery
+          ? await (memory as any).query({ threadId, resourceId: userId, selectBy: { last: 50 } })
+          : await (memory as any).recall({ threadId, resourceId: userId })
+
         const messages = result.messages || result.uiMessages || []
-        console.log(`[MemoryService] Memory.recall returned ${messages.length} messages`)
-        
-        const formattedMessages = messages
-          .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
-          .map((msg: any) => {
-            const extractedContent = extractTextContent(msg)
-            if (extractedContent.length === 0) {
-              const hasEmptyParts = msg.content?.format === 2 && Array.isArray(msg.content?.parts) && msg.content.parts.length === 0
-              if (!hasEmptyParts) {
-                console.log(`[MemoryService] Failed to extract content for ${msg.id}`)
-              }
+        console.log(`[MemoryService] Found ${messages.length} messages in Mastra`)
+
+        messages.forEach((msg: any) => {
+          if (!messagesMap.has(msg.id) && (msg.role === 'user' || msg.role === 'assistant')) {
+            const content = extractTextContent(msg)
+            if (content) {
+              messagesMap.set(msg.id, {
+                id: msg.id,
+                role: msg.role as 'user' | 'assistant',
+                content,
+                createdAt: msg.createdAt || new Date()
+              })
             }
-            return {
-              id: msg.id,
-              role: msg.role as 'user' | 'assistant',
-              content: extractedContent,
-              createdAt: msg.createdAt || new Date(),
-            }
-          })
-          .filter((msg: Message) => msg.content.length > 0)
-        
-        return formattedMessages
-      } catch (recallError) {
-        console.error(`[MemoryService] Memory.recall() failed:`, recallError)
-        // Fall through to fallback
+          }
+        })
       }
+    } catch (error) {
+      console.error(`[MemoryService] Error reading from Mastra:`, error)
     }
-    
-    // Fallback: Use memory's getThreadById to check if thread exists
-    console.log(`[MemoryService] Using fallback method for history retrieval`)
-    
-    const thread = await (memory as any).getThreadById({ threadId })
-    if (!thread) {
-      console.log(`[MemoryService] Thread ${threadId} not found`)
-      return []
-    }
-    
-    console.warn(`[MemoryService] No message retrieval method available - recall failed`)
-    return []
-  } catch (error) {
-    console.error(`[MemoryService] Error getting messages:`, error)
-    return []
   }
+
+  // Convert map to array and sort
+  const finalMessages = Array.from(messagesMap.values()).sort((a, b) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
+
+  console.log(`[MemoryService] Returning ${finalMessages.length} combined messages`)
+  return finalMessages
 }
 
 /**
@@ -405,22 +410,24 @@ export async function getHistory(
  */
 export async function getThreads(userId: string): Promise<Thread[]> {
   await ensureStorageInitialized()
-  
+
   try {
-    // Use Memory instance method - listThreadsByResourceId
-    const result = await (memory as any).listThreadsByResourceId({ resourceId: userId })
-    
-    // The result may be an object with threads property or an array directly
-    const threads = result?.threads || result
-    
+    // Beta storage API changed: try a set of possible methods
+    const threads =
+      (await (storage as any).getThreadsByResource?.({ resourceId: userId })) ??
+      (await (storage as any).getThreads?.({ resourceId: userId })) ??
+      (await (storage as any).listThreads?.({ resourceId: userId })) ??
+      (await (storage as any).getThreadsByResourceId?.({ resourceId: userId })) ?? // legacy
+      []
+
     // Ensure threads is an array before mapping
     if (!Array.isArray(threads)) {
-      console.error(`[MemoryService] listThreadsByResourceId returned non-array:`, typeof result, result)
+      console.error(`[MemoryService] getThreads returned non-array:`, typeof threads, threads)
       return []
     }
-    
+
     console.log(`[MemoryService] Found ${threads.length} threads for user ${userId}`)
-    
+
     // Map and sort threads by updatedAt descending (most recent first)
     const mappedThreads = threads
       .map((t: any) => ({
@@ -435,7 +442,7 @@ export async function getThreads(userId: string): Promise<Thread[]> {
         const timeB = b.updatedAt.getTime()
         return timeB - timeA
       })
-    
+
     console.log(`[MemoryService] Returning ${mappedThreads.length} sorted threads`)
     return mappedThreads
   } catch (error) {
@@ -454,8 +461,8 @@ export async function getOrCreateThread(
   title?: string
 ): Promise<Thread> {
   await ensureStorageInitialized()
-  
-  // Try to get existing thread from storage
+
+  // 1. Try to get existing thread from storage
   const existing = await storage.getThreadById({ threadId })
 
   if (existing) {
@@ -467,7 +474,7 @@ export async function getOrCreateThread(
     }
   }
 
-  // Create thread through storage to ensure proper integration
+  // 2. Create thread through storage to ensure proper integration
   const thread = await storage.saveThread({
     thread: {
       id: threadId,
@@ -548,23 +555,23 @@ export async function updateThreadTitle(
  */
 export async function cleanupEmptyThreads(userId: string): Promise<{ deleted: number; kept: number }> {
   await ensureStorageInitialized()
-  
+
   // Get all threads for user
-  const threads = await storage.getThreadsByResourceId({ resourceId: userId })
-  
+  const threads = await getThreads(userId)
+
   if (!Array.isArray(threads)) {
-    console.error(`[MemoryService] listThreadsByResourceId returned non-array:`, typeof threads)
+    console.error(`[MemoryService] listThreadsByResource returned non-array:`, typeof threads)
     return { deleted: 0, kept: 0 }
   }
-  
+
   let deleted = 0
   let kept = 0
-  
+
   for (const thread of threads) {
     try {
       // Check if thread has any messages using recall
       let hasMessages = false
-      
+
       if (typeof (memory as any).recall === 'function') {
         const recallResult = await (memory as any).recall({
           threadId: thread.id,
@@ -573,7 +580,7 @@ export async function cleanupEmptyThreads(userId: string): Promise<{ deleted: nu
         })
         hasMessages = (recallResult.messages && recallResult.messages.length > 0)
       }
-      
+
       if (!hasMessages) {
         // Delete empty thread
         await (memory as any).deleteThread({ threadId: thread.id })
@@ -587,7 +594,7 @@ export async function cleanupEmptyThreads(userId: string): Promise<{ deleted: nu
       kept++ // Keep thread if we can't check it
     }
   }
-  
+
   console.log(`[MemoryService] Cleanup complete: deleted ${deleted} empty threads, kept ${kept} threads with messages`)
   return { deleted, kept }
 }
