@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js'
 import apiRoutes from './routes/api.js'
 import { requireAuth } from './middleware/auth.js'
 import { renderDashboard } from './views/auth.js'
+import { handleRequest } from './auth/index.js'
 import { closePool } from '../../src/db/postgres.js'
 import { serverConfig } from '../../src/mastra/config/config.js'
 
@@ -18,6 +19,21 @@ app.use('/api/*', cors({
   origin: ['http://localhost:3000'],
   credentials: true,
 }))
+
+// Mount Better Auth handler for OAuth (must be before other /api routes)
+// Better Auth handles routes like /api/auth/sign-in/google, /api/auth/callback/google, etc.
+// Use app.on() to match the exact route pattern as shown in Better Auth docs
+app.on(['POST', 'GET', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], '/api/auth/*', async (c) => {
+  console.log('Better Auth route matched:', c.req.path, c.req.method)
+  try {
+    const response = await handleRequest(c.req.raw)
+    console.log('Better Auth response status:', response.status)
+    return response
+  } catch (error) {
+    console.error('Better Auth handler error:', error)
+    return c.json({ error: 'Authentication error' }, 500)
+  }
+})
 
 // Mount auth routes at /auth (form-based)
 app.route('/auth', authRoutes)

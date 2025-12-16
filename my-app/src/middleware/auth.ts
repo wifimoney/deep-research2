@@ -28,19 +28,24 @@ export async function requireAuth(c: Context, next: Next) {
   try {
     const betterAuthSession = await getBetterAuthSession(c.req.raw)
     if (betterAuthSession) {
-      // Get user from Better Auth session
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, betterAuthSession.userId),
-      })
+      // Get user ID from Better Auth session (check both session.userId and user.id)
+      const userId = betterAuthSession.session?.userId || betterAuthSession.user?.id
       
-      if (user) {
-        c.set('user', {
-          id: user.id,
-          username: user.email?.split('@')[0] || 'User',
-          email: user.email || '',
+      if (userId) {
+        // Get user from database
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, userId),
         })
-        await next()
-        return
+        
+        if (user) {
+          c.set('user', {
+            id: user.id,
+            username: user.email?.split('@')[0] || 'User',
+            email: user.email || '',
+          })
+          await next()
+          return
+        }
       }
     }
   } catch (error) {
