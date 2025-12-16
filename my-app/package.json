@@ -20,6 +20,7 @@
     "@mastra/memory": "^1.0.0-beta.4",
     "@mastra/pg": "^1.0.0-beta.7",
     "@openrouter/ai-sdk-provider": "^0.4.3",
+    "@sentry/node": "^10.31.0",
     "ai": "^4.3.19",
     "bcrypt": "^5.1.1",
     "better-auth": "^1.4.7",

@@ -499,6 +499,8 @@ export function renderLoginPage(
 
         async function signInWithGoogle() {
           const errorDiv = document.getElementById('error');
+          errorDiv.style.display = 'none';
+          
           try {
             const response = await fetch('/api/auth/sign-in/social', {
               method: 'POST',
@@ -511,20 +513,47 @@ export function renderLoginPage(
               })
             });
             
-            const data = await response.json();
+            console.log('Sign-in response status:', response.status);
+            console.log('Sign-in response headers:', Object.fromEntries(response.headers.entries()));
             
-            if (data.url) {
-              window.location.href = data.url;
-            } else if (data.error) {
-               errorDiv.textContent = data.error;
-               errorDiv.style.display = 'block';
+            // Check if response is a redirect
+            if (response.redirected || response.status === 302 || response.status === 307) {
+              const location = response.headers.get('location') || response.url;
+              console.log('Redirecting to:', location);
+              window.location.href = location;
+              return;
+            }
+            
+            // Try to parse as JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await response.json();
+              console.log('Sign-in response data:', data);
+              
+              if (data.url) {
+                window.location.href = data.url;
+              } else if (data.error) {
+                errorDiv.textContent = data.error;
+                errorDiv.style.display = 'block';
+              } else {
+                errorDiv.textContent = 'Failed to initiate Google login';
+                errorDiv.style.display = 'block';
+              }
             } else {
-               errorDiv.textContent = 'Failed to initiate Google login';
-               errorDiv.style.display = 'block';
+              // Not JSON, might be HTML or redirect
+              const text = await response.text();
+              console.log('Non-JSON response:', text.substring(0, 200));
+              
+              if (!response.ok) {
+                errorDiv.textContent = 'Error ' + response.status + ': ' + response.statusText;
+                errorDiv.style.display = 'block';
+              } else {
+                errorDiv.textContent = 'Unexpected response from server';
+                errorDiv.style.display = 'block';
+              }
             }
           } catch (error) {
             console.error('Google sign-in error:', error);
-            const errorDiv = document.getElementById('error');
             errorDiv.textContent = 'An error occurred during Google sign-in. Please try again.';
             errorDiv.style.display = 'block';
           }

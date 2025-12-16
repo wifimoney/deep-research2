@@ -13,11 +13,12 @@ export const auth = betterAuth({
   basePath: "/api/auth", // Explicitly set basePath (default is /api/auth)
   database: drizzleAdapter(db, {
     provider: "pg",
+    usePlural: true, // All tables use plural form
     schema: {
       users,
       sessions,
-      accounts: oauthAccounts,
-      verification,
+      accounts: oauthAccounts, // Map 'accounts' to 'oauth_accounts' table
+      verifications: verification, // Map 'verifications' to 'verification' table
     }
   }),
   socialProviders: {

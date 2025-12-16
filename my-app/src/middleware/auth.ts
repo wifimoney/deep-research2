@@ -26,9 +26,21 @@ declare module 'hono' {
 export async function requireAuth(c: Context, next: Next) {
   // First check Better Auth session
   try {
+    // Log cookies for debugging
+    const cookies = c.req.header('cookie')
+    console.log('Request cookies:', cookies?.substring(0, 200)) // Log first 200 chars
+    
     const betterAuthSession = await getBetterAuthSession(c.req.raw)
-    if (betterAuthSession) {
-      // Get user ID from Better Auth session (check both session.userId and user.id)
+    console.log('Better Auth session check:', {
+      hasSession: !!betterAuthSession,
+      sessionUserId: betterAuthSession?.session?.userId,
+      userId: betterAuthSession?.user?.id,
+      userEmail: betterAuthSession?.user?.email,
+      userName: betterAuthSession?.user?.name,
+    })
+    
+    if (betterAuthSession && betterAuthSession.user) {
+      // Get user ID from Better Auth session
       const userId = betterAuthSession.session?.userId || betterAuthSession.user?.id
       
       if (userId) {
@@ -37,18 +49,29 @@ export async function requireAuth(c: Context, next: Next) {
           where: eq(users.id, userId),
         })
         
+        console.log('Found user in database:', { userId, email: user?.email, name: user?.name })
+        
         if (user) {
+          // Use name from Better Auth if available, then database name, then username, then derive from email
+          const username = betterAuthSession.user.name || user.name || user.username || user.email?.split('@')[0] || 'User'
+          
           c.set('user', {
             id: user.id,
-            username: user.email?.split('@')[0] || 'User',
-            email: user.email || '',
+            username,
+            email: user.email || betterAuthSession.user.email || '',
           })
+          console.log('User authenticated via Better Auth, proceeding to dashboard')
           await next()
           return
+        } else {
+          console.warn('Better Auth session found but user not in database:', userId)
         }
       }
+    } else {
+      console.log('No Better Auth session found')
     }
   } catch (error) {
+    console.error('Better Auth session check error:', error)
     // Better Auth session check failed, try legacy session
   }
 
