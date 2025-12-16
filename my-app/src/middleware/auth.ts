@@ -1,6 +1,10 @@
 import type { Context, Next } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { getSessionWithUser, type SessionWithUser } from '../services/userService.js'
+import { getSession as getBetterAuthSession } from '../auth/index.js'
+import { db } from '../db/drizzle.js'
+import { users } from '../db/schema.js'
+import { eq } from 'drizzle-orm'
 
 // Extend Hono's context to include user
 declare module 'hono' {
@@ -17,8 +21,33 @@ declare module 'hono' {
 /**
  * Middleware to require authentication
  * Redirects to login page if not authenticated
+ * Checks both Better Auth sessions and legacy sessions
  */
 export async function requireAuth(c: Context, next: Next) {
+  // First check Better Auth session
+  try {
+    const betterAuthSession = await getBetterAuthSession(c.req.raw)
+    if (betterAuthSession) {
+      // Get user from Better Auth session
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, betterAuthSession.userId),
+      })
+      
+      if (user) {
+        c.set('user', {
+          id: user.id,
+          username: user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+        })
+        await next()
+        return
+      }
+    }
+  } catch (error) {
+    // Better Auth session check failed, try legacy session
+  }
+
+  // Fallback to legacy session check
   const sessionId = getCookie(c, 'session_id')
 
   if (!sessionId) {
@@ -51,8 +80,20 @@ export async function requireAuth(c: Context, next: Next) {
 /**
  * Middleware to redirect authenticated users away from auth pages
  * (e.g., if logged in user visits /login, redirect to dashboard)
+ * Checks both Better Auth sessions and legacy sessions
  */
 export async function redirectIfAuthenticated(c: Context, next: Next) {
+  // Check Better Auth session first
+  try {
+    const betterAuthSession = await getBetterAuthSession(c.req.raw)
+    if (betterAuthSession) {
+      return c.redirect('/dashboard')
+    }
+  } catch {
+    // Better Auth session check failed, try legacy session
+  }
+
+  // Check legacy session
   const sessionId = getCookie(c, 'session_id')
 
   if (sessionId) {

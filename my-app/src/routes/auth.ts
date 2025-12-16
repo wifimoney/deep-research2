@@ -10,11 +10,22 @@ import {
 } from '../services/userService.js'
 import { verifyPassword, SESSION_COOKIE_OPTIONS } from '../utils/auth.js'
 import { redirectIfAuthenticated } from '../middleware/auth.js'
+import { getSession } from '../auth/index.js'
 
 const auth = new Hono()
 
+// GET /auth - Redirect to login
+auth.get('/', redirectIfAuthenticated, (c) => {
+  return c.redirect('/auth/login')
+})
+
 // GET /auth/login - Show login form
-auth.get('/login', redirectIfAuthenticated, (c) => {
+auth.get('/login', redirectIfAuthenticated, async (c) => {
+  // Check if user is already authenticated via Better Auth
+  const session = await getSession(c.req.raw)
+  if (session) {
+    return c.redirect('/dashboard')
+  }
   return c.html(renderLoginPage())
 })
 
