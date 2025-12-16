@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/drizzle.js";
-import { users, sessions, oauthAccounts } from "../db/schema.js";
+import { users, sessions, oauthAccounts, verification } from "../db/schema.js";
 
 // Base URL for the application
 const port = Number(process.env.PORT || 3000);
@@ -10,15 +11,15 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-change-in-production",
   baseURL,
   basePath: "/api/auth", // Explicitly set basePath (default is /api/auth)
-  database: {
-    type: "drizzle",
-    db,
-    tables: {
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
       users,
       sessions,
       accounts: oauthAccounts,
-    },
-  },
+      verification,
+    }
+  }),
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
