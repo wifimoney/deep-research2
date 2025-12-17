@@ -25,10 +25,44 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Request Gmail and Contacts API scopes
+      scope: [
+        'openid',
+        'email',
+        'profile',
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/contacts.readonly'
+      ],
+      // Ensure we get refresh tokens
+      accessType: 'offline',
+      prompt: 'consent',
     },
   },
   cookies: {
     secure: process.env.NODE_ENV === "production",
+  },
+  // Add error handling configuration
+  onError: (error, context) => {
+    console.error('Better Auth error:', error)
+    console.error('Context:', context)
+    
+    // Log to Sentry if available
+    if (typeof Sentry !== 'undefined') {
+      const Sentry = require('@sentry/node')
+      Sentry.captureException(error, {
+        extra: {
+          context: context?.path || 'unknown',
+        }
+      })
+    }
+  },
+  // Configure callback URL explicitly
+  redirects: {
+    signIn: '/dashboard',
+    signUp: '/dashboard',
+    afterSignIn: '/dashboard',
+    afterSignUp: '/dashboard',
+    onError: '/auth/login',
   },
 });
 

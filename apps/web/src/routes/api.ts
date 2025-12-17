@@ -370,6 +370,18 @@ api.get('/dashboard/gmail', async (c: Context) => {
   } catch (error) {
     console.error('List Gmail error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Failed to list emails'
+    
+    // Check if the error is about missing Google account
+    if (errorMessage.includes('NO_GOOGLE_ACCOUNT') || errorMessage.includes('NO_ACCESS_TOKEN')) {
+      // Extract user-friendly message (after the error code prefix)
+      const friendlyMessage = errorMessage.split(': ')[1] || errorMessage
+      return c.json({ 
+        success: false, 
+        error: friendlyMessage,
+        requiresGoogleAuth: true 
+      }, 401)
+    }
+    
     return c.json({ success: false, error: errorMessage }, 500)
   }
 })
@@ -393,6 +405,18 @@ api.get('/dashboard/contacts', async (c: Context) => {
   } catch (error) {
     console.error('List Contacts error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Failed to list contacts'
+    
+    // Check if the error is about missing Google account
+    if (errorMessage.includes('NO_GOOGLE_ACCOUNT') || errorMessage.includes('NO_ACCESS_TOKEN')) {
+      // Extract user-friendly message (after the error code prefix)
+      const friendlyMessage = errorMessage.split(': ')[1] || errorMessage
+      return c.json({ 
+        success: false, 
+        error: friendlyMessage,
+        requiresGoogleAuth: true 
+      }, 401)
+    }
+    
     return c.json({ success: false, error: errorMessage }, 500)
   }
 })
