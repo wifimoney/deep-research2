@@ -1,0 +1,9 @@
+# Bun configuration for monorepo
+[install]
+# Use workspace protocol for internal packages
+auto = true
+
+# Prefer Bun's built-in bundler
+[install.scopes]
+"@repo" = { }
+
