@@ -18,8 +18,12 @@ async function getGoogleToken(userId: string) {
         ),
     });
 
-    if (!account || !account.accessToken) {
-        throw new Error('No Google account connected or missing access token. Please connect your Google account in settings.');
+    if (!account) {
+        throw new Error('NO_GOOGLE_ACCOUNT: No Google account connected. Please sign in with Google to access Gmail and Contacts.');
+    }
+    
+    if (!account.accessToken) {
+        throw new Error('NO_ACCESS_TOKEN: Google account found but missing access token. Please sign in with Google again.');
     }
 
     // Check if token is expired (or close to expiring, e.g., within 5 minutes)

@@ -41,24 +41,84 @@ app.on(['POST', 'GET', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], '/api/auth/*', asyn
   const pathname = new URL(c.req.url).pathname
   console.log('Better Auth route matched:', pathname, c.req.method)
 
-  // Intercept error page requests and redirect to dashboard
+  // Intercept error page requests and redirect to login with helpful message
   if (pathname === '/api/auth/error') {
-    const errorParam = new URL(c.req.url).searchParams.get('error')
+    const url = new URL(c.req.url)
+    const errorParam = url.searchParams.get('error')
+    const errorDescription = url.searchParams.get('error_description')
+    
     console.error('Better Auth error page accessed:', errorParam)
-    Sentry.captureMessage(`Better Auth error page accessed: ${errorParam}`, 'error')
-    // Redirect to dashboard - user might still be logged in
-    return c.redirect('/dashboard')
+    console.error('Error description:', errorDescription)
+    
+    Sentry.captureMessage(`Better Auth error page accessed: ${errorParam}`, {
+      level: 'error',
+      extra: {
+        error: errorParam,
+        description: errorDescription,
+        fullUrl: c.req.url
+      }
+    })
+    
+    // Create a user-friendly error message
+    let userMessage = 'Authentication failed. Please try again.'
+    if (errorParam === 'access_denied') {
+      userMessage = 'You denied access to your Google account. Please try again and grant the necessary permissions.'
+    } else if (errorParam === 'invalid_request') {
+      userMessage = 'Invalid authentication request. Please contact support if this persists.'
+    } else if (errorDescription) {
+      userMessage = `Authentication error: ${errorDescription}`
+    }
+    
+    // Redirect to login with error message
+    const loginUrl = new URL('/auth/login', c.req.url)
+    loginUrl.searchParams.set('error', userMessage)
+    return c.redirect(loginUrl.toString())
   }
 
   // Handle OAuth callback - ensure it redirects to dashboard
   if (pathname.startsWith('/api/auth/callback/')) {
     console.log('OAuth callback detected:', pathname)
     const url = new URL(c.req.url)
+    const code = url.searchParams.get('code')
+    const state = url.searchParams.get('state')
+    const error = url.searchParams.get('error')
+    
     console.log('Callback query params:', {
-      code: url.searchParams.get('code') ? 'present' : 'missing',
-      state: url.searchParams.get('state') ? 'present' : 'missing',
-      error: url.searchParams.get('error') || 'none',
+      code: code ? 'present' : 'missing',
+      state: state ? 'present' : 'missing',
+      error: error || 'none',
     })
+    
+    // Check for missing required OAuth parameters
+    if (!code && !error) {
+      const errorMsg = 'OAuth callback missing required "code" parameter. This may indicate a misconfigured OAuth redirect URI or an incomplete OAuth flow.'
+      console.error('❌', errorMsg)
+      console.error('Full callback URL:', c.req.url)
+      console.error('Expected redirect URI should be:', `${baseURL}/api/auth/callback/google`)
+      Sentry.captureMessage(errorMsg, {
+        level: 'error',
+        extra: {
+          pathname,
+          fullUrl: c.req.url,
+          hasCode: !!code,
+          hasState: !!state,
+          error: error || 'none',
+          expectedRedirectUri: `${baseURL}/api/auth/callback/google`
+        }
+      })
+    }
+    
+    if (!state && !error) {
+      const errorMsg = 'OAuth callback missing "state" parameter. This is a security risk and indicates an OAuth flow issue.'
+      console.error('❌', errorMsg)
+      Sentry.captureMessage(errorMsg, {
+        level: 'warning',
+        extra: {
+          pathname,
+          fullUrl: c.req.url,
+        }
+      })
+    }
   }
 
   try {
@@ -72,10 +132,29 @@ app.on(['POST', 'GET', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], '/api/auth/*', asyn
       if (handlerError instanceof Error) {
         console.error('Error message:', handlerError.message)
         console.error('Error stack:', handlerError.stack)
+        
+        // Check for common OAuth configuration errors
+        if (handlerError.message.includes('redirect_uri_mismatch') || 
+            handlerError.message.includes('redirect_uri')) {
+          console.error('⚠️ REDIRECT URI MISMATCH DETECTED!')
+          console.error('Expected redirect URI should be:', `${baseURL}/api/auth/callback/google`)
+          console.error('Please verify this matches your Google OAuth Console configuration')
+          Sentry.captureMessage('OAuth redirect URI mismatch detected', {
+            level: 'error',
+            extra: {
+              error: handlerError.message,
+              expectedUri: `${baseURL}/api/auth/callback/google`,
+              baseURL,
+              pathname
+            }
+          })
+        }
       }
-      // If it's a callback, still try to redirect to dashboard
+      // If it's a callback, redirect to login with error message
       if (pathname.startsWith('/api/auth/callback/')) {
-        return c.redirect('/dashboard')
+        const loginUrl = new URL('/auth/login', c.req.url)
+        loginUrl.searchParams.set('error', 'Google sign-in failed. Please try again or contact support.')
+        return c.redirect(loginUrl.toString())
       }
       throw handlerError
     }
@@ -90,9 +169,22 @@ app.on(['POST', 'GET', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], '/api/auth/*', asyn
 
       // If redirecting to error page, log the error details
       if (location?.includes('/error')) {
-        const errorParam = new URL(location).searchParams.get('error')
+        const locationUrl = new URL(location, c.req.url)
+        const errorParam = locationUrl.searchParams.get('error')
+        const errorDescription = locationUrl.searchParams.get('error_description')
+        
         console.error('❌ OAuth callback error:', errorParam)
-        Sentry.captureMessage(`OAuth callback error redirect: ${errorParam}`, 'error')
+        console.error('Error description:', errorDescription)
+        
+        Sentry.captureMessage(`OAuth callback error redirect: ${errorParam}`, {
+          level: 'error',
+          extra: {
+            error: errorParam,
+            description: errorDescription,
+            redirectLocation: location,
+            callbackUrl: c.req.url
+          }
+        })
 
         // Try to get error details from response body
         try {
@@ -102,8 +194,19 @@ app.on(['POST', 'GET', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], '/api/auth/*', asyn
           console.error('Could not read error response body')
         }
 
-        // Still redirect to dashboard - user might be logged in despite error
-        return c.redirect('/dashboard')
+        // Redirect to login with helpful error message instead of dashboard
+        let userMessage = 'Google sign-in failed. Please try again.'
+        if (errorParam === 'access_denied') {
+          userMessage = 'You denied access to your Google account. Please grant the necessary permissions to continue.'
+        } else if (errorParam === 'invalid_grant') {
+          userMessage = 'Google authentication expired or was revoked. Please sign in again.'
+        } else if (errorDescription) {
+          userMessage = `Google sign-in error: ${errorDescription}`
+        }
+        
+        const loginUrl = new URL('/auth/login', c.req.url)
+        loginUrl.searchParams.set('error', userMessage)
+        return c.redirect(loginUrl.toString())
       }
 
       // Success case - redirect to dashboard with cookies
