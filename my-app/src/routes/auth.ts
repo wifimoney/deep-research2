@@ -10,7 +10,7 @@ import {
 } from '../services/userService.js'
 import { verifyPassword, SESSION_COOKIE_OPTIONS } from '../utils/auth.js'
 import { redirectIfAuthenticated } from '../middleware/auth.js'
-import { getSession } from '../auth/index.js'
+import { getSession, auth as betterAuthInstance } from '../auth/index.js'
 
 const auth = new Hono()
 
@@ -134,22 +134,42 @@ auth.post('/register', async (c) => {
 
 // POST /auth/logout - Handle logout
 auth.post('/logout', async (c) => {
-  const { getCookie } = await import('hono/cookie')
-  const sessionId = getCookie(c, 'session_id')
-
-  if (sessionId) {
-    try {
-      await deleteSession(sessionId)
-    } catch (error) {
-      console.error('Logout error:', error)
+  try {
+    // Handle Better Auth session (for OAuth users like Google)
+    const betterAuthSession = await getSession(c.req.raw)
+    if (betterAuthSession) {
+      console.log('Better Auth session found, attempting sign-out...')
+      try {
+        await betterAuthInstance.api.signOut({ headers: c.req.raw.headers })
+        console.log('Better Auth sign-out successful')
+      } catch (error) {
+        console.error('Better Auth sign-out error:', error)
+        // Continue with legacy logout even if Better Auth sign-out fails
+      }
     }
+
+    // Handle legacy session (for email/password users)
+    const { getCookie } = await import('hono/cookie')
+    const sessionId = getCookie(c, 'session_id')
+
+    if (sessionId) {
+      try {
+        await deleteSession(sessionId)
+      } catch (error) {
+        console.error('Legacy session deletion error:', error)
+      }
+    }
+
+    // Clear legacy session cookie
+    deleteCookie(c, 'session_id', { path: '/' })
+
+    // Redirect to login
+    return c.redirect('/auth/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    // Still redirect to login even if logout fails
+    return c.redirect('/auth/login')
   }
-
-  // Clear session cookie
-  deleteCookie(c, 'session_id', { path: '/' })
-
-  // Redirect to login
-  return c.redirect('/auth/login')
 })
 
 export default auth

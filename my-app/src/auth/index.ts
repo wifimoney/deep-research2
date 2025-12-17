@@ -53,12 +53,13 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       // Request Gmail and Contacts API scopes
+      // Note: Using gmail.modify (matches GCP config) - includes read permissions
       scope: [
         'openid',
         'profile',
         'email',
-        'https://www.googleapis.com/auth/gmail.readonly',           // ✅ Add this
-        'https://www.googleapis.com/auth/contacts.readonly'         // ✅ Add this
+        'https://www.googleapis.com/auth/gmail.modify',             // Matches GCP: Read, compose, and send emails
+        'https://www.googleapis.com/auth/contacts.readonly'         // Matches GCP: See and download contacts
       ],
       // Ensure we get refresh tokens
       accessType: 'offline',

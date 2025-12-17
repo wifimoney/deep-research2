@@ -14,7 +14,10 @@ export const listGmail = createTool({
             // Mastra passes the resourceId as executionContext.resourceId if provided in generate()
             const userId = (executionContext as any)?.resourceId;
             if (!userId) {
-                return { error: 'User ID is missing from tool context' };
+                return { 
+                    error: 'User ID is missing from tool context',
+                    messages: []
+                };
             }
 
             const { query, maxResults } = data;
@@ -23,7 +26,25 @@ export const listGmail = createTool({
             return { messages };
 
         } catch (error: any) {
-            return { error: error.message };
+            // Check for scope errors specifically
+            const errorMessage = error.message || 'Unknown error';
+            const isScopeError = errorMessage.includes('403') || 
+                               errorMessage.includes('insufficient') || 
+                               errorMessage.includes('scope') ||
+                               errorMessage.includes('PERMISSION_DENIED');
+            const isAuthError = errorMessage.includes('No Google account') || 
+                              errorMessage.includes('missing access token');
+            
+            return { 
+                error: isScopeError 
+                    ? 'OAuth token missing required Gmail scopes. The user needs to log out and log back in with Google to grant Gmail permissions.'
+                    : isAuthError
+                    ? 'No Google account connected or missing access token. Please connect your Google account in settings.'
+                    : errorMessage,
+                messages: [],
+                scopeError: isScopeError,
+                authError: isAuthError
+            };
         }
     }
 });
@@ -38,7 +59,10 @@ export const listContacts = createTool({
         try {
             const userId = (executionContext as any)?.resourceId;
             if (!userId) {
-                return { error: 'User ID is missing from tool context' };
+                return { 
+                    error: 'User ID is missing from tool context',
+                    contacts: []
+                };
             }
 
             const { maxResults } = data;
@@ -47,7 +71,25 @@ export const listContacts = createTool({
             return { contacts };
 
         } catch (error: any) {
-            return { error: error.message };
+            // Check for scope errors specifically
+            const errorMessage = error.message || 'Unknown error';
+            const isScopeError = errorMessage.includes('403') || 
+                               errorMessage.includes('insufficient') || 
+                               errorMessage.includes('scope') ||
+                               errorMessage.includes('PERMISSION_DENIED');
+            const isAuthError = errorMessage.includes('No Google account') || 
+                              errorMessage.includes('missing access token');
+            
+            return { 
+                error: isScopeError 
+                    ? 'OAuth token missing required Contacts scopes. The user needs to log out and log back in with Google to grant Contacts permissions.'
+                    : isAuthError
+                    ? 'No Google account connected or missing access token. Please connect your Google account in settings.'
+                    : errorMessage,
+                contacts: [],
+                scopeError: isScopeError,
+                authError: isAuthError
+            };
         }
     }
 });

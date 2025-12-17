@@ -23,7 +23,7 @@ export const dashboardAgent = new Agent({
         
         Do not make up information. Only state what is returned by the tools.
     `,
-    model: openrouter('google/gemini-2.0-flash-exp:free'),
+    model: openrouter('openai/gpt-4o-mini'),
     memory: standardMemory as any,
     tools: {
         listGmail,

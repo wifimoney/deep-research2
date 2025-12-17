@@ -247,13 +247,13 @@ export async function sendMessage(
   // 1. Store USER message in Mastra Memory
   try {
     console.log(`[MemoryService] Storing USER message in Mastra Memory...`)
-    await (memory as any).storage.saveMessages({
+    await storage.saveMessages({
       messages: [{
         id: userMsgId,
         threadId,
         resourceId: userId, // Required by Mastra storage
         role: 'user',
-        content: message,
+        content: { format: 2, parts: [{ type: 'text', text: message }] },
         createdAt: now,
         type: 'text'
       }]
@@ -306,13 +306,13 @@ export async function sendMessage(
   // 2. Store ASSISTANT message in Mastra Memory
   try {
     console.log(`[MemoryService] Storing ASSISTANT message in Mastra Memory...`)
-    await (memory as any).storage.saveMessages({
+    await storage.saveMessages({
       messages: [{
         id: assistantMsgId,
         threadId,
         resourceId: userId, // Required by Mastra storage
         role: 'assistant',
-        content: responseText,
+        content: { format: 2, parts: [{ type: 'text', text: responseText }] },
         createdAt: assistantCreatedAt,
         type: 'text'
       }]
@@ -381,13 +381,13 @@ export async function sendDashboardMessage(
 
   // 1. Store USER message in Mastra Memory
   try {
-    await (memory as any).storage.saveMessages({
+    await storage.saveMessages({
       messages: [{
         id: userMsgId,
         threadId,
         resourceId: userId, // Required by Mastra storage
         role: 'user',
-        content: message,
+        content: { format: 2, parts: [{ type: 'text', text: message }] },
         createdAt: now,
         type: 'text'
       }]
@@ -420,13 +420,13 @@ export async function sendDashboardMessage(
 
   // 2. Store ASSISTANT message in Mastra Memory
   try {
-    await (memory as any).storage.saveMessages({
+    await storage.saveMessages({
       messages: [{
         id: assistantMsgId,
         threadId,
         resourceId: userId, // Required by Mastra storage
         role: 'assistant',
-        content: responseText,
+        content: { format: 2, parts: [{ type: 'text', text: responseText }] },
         createdAt: assistantCreatedAt,
         type: 'text'
       }]

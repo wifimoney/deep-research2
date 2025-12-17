@@ -9,7 +9,7 @@ import {
   getSessionWithUser,
 } from '../services/userService.js'
 import { verifyPassword, SESSION_COOKIE_OPTIONS } from '../utils/auth.js'
-import { getSession as getBetterAuthSession } from '../auth/index.js'
+import { getSession as getBetterAuthSession, auth as betterAuthInstance } from '../auth/index.js'
 import { db } from '../db/drizzle.js'
 import { users } from '../db/schema.js'
 import { eq } from 'drizzle-orm'
@@ -131,20 +131,38 @@ api.post('/register', async (c) => {
 
 // POST /api/logout - JSON logout endpoint
 api.post('/logout', async (c) => {
-  const sessionId = getCookie(c, 'session_id')
-
-  if (sessionId) {
-    try {
-      await deleteSession(sessionId)
-    } catch (error) {
-      console.error('API Logout error:', error)
+  try {
+    // Handle Better Auth session (for OAuth users like Google)
+    const betterAuthSession = await getBetterAuthSession(c.req.raw)
+    if (betterAuthSession) {
+      console.log('Better Auth session found, attempting sign-out...')
+      try {
+        await betterAuthInstance.api.signOut({ headers: c.req.raw.headers })
+        console.log('Better Auth sign-out successful')
+      } catch (error) {
+        console.error('Better Auth sign-out error:', error)
+        // Continue with legacy logout even if Better Auth sign-out fails
+      }
     }
+
+    // Handle legacy session (for email/password users)
+    const sessionId = getCookie(c, 'session_id')
+    if (sessionId) {
+      try {
+        await deleteSession(sessionId)
+      } catch (error) {
+        console.error('Legacy session deletion error:', error)
+      }
+    }
+
+    // Clear legacy session cookie
+    deleteCookie(c, 'session_id', { path: '/' })
+
+    return c.json({ success: true, message: 'Logged out successfully' })
+  } catch (error) {
+    console.error('Logout error:', error)
+    return c.json({ success: false, error: 'Failed to logout' }, 500)
   }
-
-  // Clear session cookie
-  deleteCookie(c, 'session_id', { path: '/' })
-
-  return c.json({ success: true })
 })
 
 // GET /api/me - Get current user
@@ -368,7 +386,18 @@ api.get('/dashboard/gmail', async (c: any) => {
       messages,
     })
   } catch (error) {
+    console.error('='.repeat(60))
     console.error('List Gmail error:', error)
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+      // Check for 403/scope errors
+      if (error.message.includes('403') || error.message.includes('insufficient') || error.message.includes('scope')) {
+        console.error('⚠️  SCOPE ERROR DETECTED: OAuth token missing Gmail scopes!')
+        console.error('   Solution: Re-authenticate with Google to get new token with gmail.readonly scope')
+      }
+    }
+    console.error('='.repeat(60))
     const errorMessage = error instanceof Error ? error.message : 'Failed to list emails'
     return c.json({ success: false, error: errorMessage }, 500)
   }
@@ -391,7 +420,18 @@ api.get('/dashboard/contacts', async (c: any) => {
       contacts,
     })
   } catch (error) {
+    console.error('='.repeat(60))
     console.error('List Contacts error:', error)
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+      // Check for 403/scope errors
+      if (error.message.includes('403') || error.message.includes('insufficient') || error.message.includes('scope')) {
+        console.error('⚠️  SCOPE ERROR DETECTED: OAuth token missing Contacts scopes!')
+        console.error('   Solution: Re-authenticate with Google to get new token with contacts.readonly scope')
+      }
+    }
+    console.error('='.repeat(60))
     const errorMessage = error instanceof Error ? error.message : 'Failed to list contacts'
     return c.json({ success: false, error: errorMessage }, 500)
   }
