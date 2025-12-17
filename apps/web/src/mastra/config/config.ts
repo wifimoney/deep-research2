@@ -121,6 +121,19 @@ export const serverConfig = {
   get isProduction() {
     return this.env === 'production';
   },
+  
+  /** Base URL for the application (critical for OAuth) */
+  get baseURL() {
+    // In production, BASE_URL MUST be set correctly for OAuth to work
+    const envBaseUrl = process.env.BASE_URL?.trim();
+    
+    if (envBaseUrl) {
+      return envBaseUrl;
+    }
+    
+    // Fallback to localhost for development
+    return `http://localhost:${this.port}`;
+  },
 };
 
 /**

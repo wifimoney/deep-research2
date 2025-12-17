@@ -1,11 +1,32 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, users, sessions, oauthAccounts, verification } from "@repo/db";
+import { serverConfig } from "../mastra/config/config.js";
 
+// Base URL for the application - CRITICAL for OAuth to work correctly
+// This MUST match the redirect URI registered in Google OAuth Console
+const baseURL = serverConfig.baseURL;
 
-// Base URL for the application
-const port = Number(process.env.PORT || 3000);
-const baseURL = process.env.BASE_URL || `http://localhost:${port}`;
+// Validate BASE_URL configuration in production
+if (serverConfig.isProduction) {
+  if (!process.env.BASE_URL) {
+    console.error('⚠️  WARNING: BASE_URL environment variable is not set in production!');
+    console.error('   OAuth callbacks will likely fail with "invalid_code" error.');
+    console.error('   Please set BASE_URL to match your production domain (e.g., https://yourdomain.com)');
+    console.error('   Current baseURL (fallback):', baseURL);
+  } else if (baseURL.includes('localhost') || baseURL.includes('127.0.0.1')) {
+    console.error('⚠️  WARNING: BASE_URL is set to localhost in production environment!');
+    console.error('   OAuth callbacks will fail. BASE_URL must match your production domain.');
+    console.error('   Current BASE_URL:', baseURL);
+  } else if (!baseURL.startsWith('https://')) {
+    console.error('⚠️  WARNING: BASE_URL should use HTTPS in production!');
+    console.error('   Current BASE_URL:', baseURL);
+  } else {
+    console.log('✅ BASE_URL correctly configured for production:', baseURL);
+  }
+}
+
+console.log(`Better Auth initialized with baseURL: ${baseURL}`);
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-change-in-production",
