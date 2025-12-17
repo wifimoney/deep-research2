@@ -7,6 +7,33 @@ import { users, sessions, oauthAccounts, verification } from "../db/schema.js";
 const port = Number(process.env.PORT || 3000);
 const baseURL = process.env.BASE_URL || `http://localhost:${port}`;
 
+// Debug: Log OAuth configuration
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+console.log('='.repeat(60));
+console.log('[Better Auth Config] OAuth Configuration:');
+console.log('='.repeat(60));
+console.log('[Better Auth Config] Base URL:', baseURL);
+console.log('[Better Auth Config] Base Path: /api/auth');
+console.log('[Better Auth Config] Callback URL:', `${baseURL}/api/auth/callback/google`);
+console.log('[Better Auth Config] Google Client ID:', googleClientId || '❌ MISSING');
+console.log('[Better Auth Config] Google Client Secret:', googleClientSecret ? `${googleClientSecret.substring(0, 15)}...` : '❌ MISSING');
+console.log('='.repeat(60));
+
+if (!googleClientId || !googleClientSecret) {
+  console.error('❌ ERROR: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing from environment variables!');
+  console.error('   Make sure your .env file is being loaded correctly.');
+  console.error('   Expected Client ID: 347902971048-o6842m0s5d2a4ppkbgnpbjr4uuf236hp.apps.googleusercontent.com');
+}
+
+// Verify the exact client ID matches
+if (googleClientId && googleClientId !== '347902971048-o6842m0s5d2a4ppkbgnpbjr4uuf236hp.apps.googleusercontent.com') {
+  console.warn('⚠️  WARNING: Client ID does not match expected value!');
+  console.warn('   Expected: 347902971048-o6842m0s5d2a4ppkbgnpbjr4uuf236hp.apps.googleusercontent.com');
+  console.warn('   Actual:  ', googleClientId);
+}
+
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-change-in-production",
   baseURL,
@@ -40,6 +67,18 @@ export const auth = betterAuth({
   },
   cookies: {
     secure: process.env.NODE_ENV === "production",
+  },
+  // Add error handling to capture OAuth errors
+  onError: (error: Error, context: { path: string }) => {
+    console.error('='.repeat(60));
+    console.error('[Better Auth Error] OAuth Error Details:');
+    console.error('='.repeat(60));
+    console.error('Error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Context:', context);
+    console.error('Path:', context?.path);
+    console.error('='.repeat(60));
   },
 });
 
