@@ -1,13 +1,12 @@
 import 'dotenv/config';
 import { Hono } from "hono";
-import { serve } from "@hono/node-server";
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import type { HonoBindings, HonoVariables } from "@mastra/hono";
 import { MastraServer } from "@mastra/hono";
 import { mastra } from "./mastra.js";
 import agentRoutes from './routes/agent.js';
-import { serverConfig } from '../../src/mastra/config/config.js';
+import { serverConfig } from './mastra/config/config.js';
 
 const app = new Hono<{ Bindings: HonoBindings; Variables: HonoVariables }>();
 
@@ -22,8 +21,8 @@ app.use('/api/*', cors({
 app.route('/api/agent', agentRoutes);
 
 // Initialize MastraServer (registers Mastra API routes)
-const server = new MastraServer({ app, mastra });
-await server.init();
+const mastraServer = new MastraServer({ app, mastra });
+await mastraServer.init();
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -36,8 +35,12 @@ app.get('/health', (c) => {
 
 const port = serverConfig.mastraPort;
 
-serve({ fetch: app.fetch, port }, () => {
-  console.log(`Mastra server running on http://localhost:${port}`);
-  console.log(`Agent API: http://localhost:${port}/api/agent`);
-  console.log(`Health check: http://localhost:${port}/health`);
+const server = Bun.serve({
+  fetch: app.fetch,
+  port,
+  hostname: '0.0.0.0',
 });
+
+console.log(`Mastra server running on http://localhost:${server.port}`);
+console.log(`Agent API: http://localhost:${server.port}/api/agent`);
+console.log(`Health check: http://localhost:${server.port}/health`);

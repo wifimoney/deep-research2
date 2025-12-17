@@ -1,6 +1,5 @@
 import "./instrument.js";
 import 'dotenv/config'
-import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { logger } from 'hono/logger'
@@ -284,25 +283,26 @@ app.get('/health', (c: Context) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Start server
+// Start server with Bun's native HTTP server
 const port = serverConfig.port
 
-const server = serve({
+const server = Bun.serve({
   fetch: app.fetch,
   port,
-}, (info) => {
-  console.log(`Server is running on http://localhost:${info.port}`)
-  console.log(`Login: http://localhost:${info.port}/auth/login`)
-  console.log(`Register: http://localhost:${info.port}/auth/register`)
-  console.log(`Dashboard: http://localhost:${info.port}/dashboard (protected)`)
+  hostname: '0.0.0.0',
 })
+
+console.log(`Server is running on http://localhost:${server.port}`)
+console.log(`Login: http://localhost:${server.port}/auth/login`)
+console.log(`Register: http://localhost:${server.port}/auth/register`)
+console.log(`Dashboard: http://localhost:${server.port}/dashboard (protected)`)
 
 // Graceful shutdown
 const shutdown = async () => {
   console.log('\nShutting down gracefully...')
 
   // Close HTTP server first (stop accepting new connections)
-  server.close()
+  server.stop()
 
   // Close database pool
   await closePool()

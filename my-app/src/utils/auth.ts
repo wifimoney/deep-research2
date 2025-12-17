@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt'
 import { v4 as uuidv4 } from 'uuid'
-import { authConfig } from '../../../src/mastra/config/config.js'
+import { authConfig } from '../mastra/config/config.js'
 
 // Salt rounds for bcrypt (higher = more secure but slower)
 const SALT_ROUNDS = authConfig.saltRounds

@@ -1,6 +1,37 @@
 import "./instrument.js";
-import 'dotenv/config'
-import { serve } from '@hono/node-server'
+import { config } from 'dotenv'
+import { resolve } from 'path'
+import { existsSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// Get current directory for ES modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Load .env files - try multiple locations
+const envPaths = [
+  resolve(process.cwd(), '../.env'),           // Root project .env (when running from my-app/)
+  resolve(process.cwd(), '.env'),               // my-app/.env
+  resolve(__dirname, '../../.env'),             // Relative to compiled location
+  resolve(__dirname, '../../../.env'),          // Root from compiled location
+]
+
+let loaded = false
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    const result = config({ path: envPath })
+    if (result.parsed && Object.keys(result.parsed).length > 0) {
+      console.log(`[dotenv] Loaded ${Object.keys(result.parsed).length} vars from ${envPath}`)
+      loaded = true
+      break
+    }
+  }
+}
+
+if (!loaded) {
+  console.warn('[dotenv] No .env file found or loaded. Tried paths:', envPaths)
+}
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { logger } from 'hono/logger'
@@ -11,8 +42,8 @@ import apiRoutes from './routes/api.js'
 import { requireAuth } from './middleware/auth.js'
 import { renderDashboard } from './views/auth.js'
 import { handleRequest } from './auth/index.js'
-import { closePool } from '../../src/db/postgres.js'
-import { serverConfig } from '../../src/mastra/config/config.js'
+import { closePool } from '@repo/db'
+import { serverConfig } from './mastra/config/config.js'
 import { Dashboard } from './components/Dashboard.js'
 
 const app = new Hono()
@@ -181,25 +212,63 @@ app.get('/health', (c: Context) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Start server
+// Start server - use Bun if available, otherwise use Node.js server
 const port = serverConfig.port
 
-const server = serve({
-  fetch: app.fetch,
-  port,
-}, (info) => {
-  console.log(`Server is running on http://localhost:${info.port}`)
-  console.log(`Login: http://localhost:${info.port}/auth/login`)
-  console.log(`Register: http://localhost:${info.port}/auth/register`)
-  console.log(`Dashboard: http://localhost:${info.port}/dashboard (protected)`)
-})
+type ServerHandle = 
+  | { port: number; stop: () => void }
+  | { port: number; close: () => void }
+
+let server: ServerHandle
+let actualPort = port
+
+// Check if running in Bun runtime
+const isBun = typeof (globalThis as any).Bun !== 'undefined'
+
+if (isBun) {
+  // Bun runtime
+  const bunServer = (globalThis as any).Bun.serve({
+    fetch: app.fetch,
+    port,
+    hostname: '0.0.0.0',
+  })
+  actualPort = bunServer.port
+  server = { port: actualPort, stop: () => bunServer.stop() }
+} else {
+  // Node.js runtime (tsx)
+  const { serve } = await import('@hono/node-server')
+  const nodeServer = serve({
+    fetch: app.fetch,
+    port,
+  }, (info) => {
+    actualPort = info.port
+    console.log(`Server is running on http://localhost:${actualPort}`)
+    console.log(`Login: http://localhost:${actualPort}/auth/login`)
+    console.log(`Register: http://localhost:${actualPort}/auth/register`)
+    console.log(`Dashboard: http://localhost:${actualPort}/dashboard (protected)`)
+  })
+  server = { port: actualPort, close: () => nodeServer.close() }
+}
+
+if (!isBun) {
+  // Node.js already logs in callback, skip here
+} else {
+  console.log(`Server is running on http://localhost:${actualPort}`)
+  console.log(`Login: http://localhost:${actualPort}/auth/login`)
+  console.log(`Register: http://localhost:${actualPort}/auth/register`)
+  console.log(`Dashboard: http://localhost:${actualPort}/dashboard (protected)`)
+}
 
 // Graceful shutdown
 const shutdown = async () => {
   console.log('\nShutting down gracefully...')
 
   // Close HTTP server first (stop accepting new connections)
-  server.close()
+  if ('stop' in server) {
+    server.stop()
+  } else {
+    server.close()
+  }
 
   // Close database pool
   await closePool()

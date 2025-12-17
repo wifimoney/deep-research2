@@ -1,8 +1,8 @@
 import { Agent } from '@mastra/core/agent';
-import { standardMemory as memory } from '../../../src/mastra/config/memory.js';
+import { standardMemory as memory } from '../mastra/config/memory.js';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 import { openai } from '@ai-sdk/openai';
-import { apiKeysConfig } from '../../../src/mastra/config/config.js';
+import { apiKeysConfig } from '../mastra/config/config.js';
 import { listGmail, listContacts } from '../tools/google-tools.js';
 
 /**

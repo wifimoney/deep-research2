@@ -1,6 +1,6 @@
 import { Mastra } from '@mastra/core/mastra';
-import { standardMemory as memory } from '../../src/mastra/config/memory.js';
-import { storage } from '../../src/mastra/config/storage.js';
+import { standardMemory as memory } from './mastra/config/memory.js';
+import { storage } from './mastra/config/storage.js';
 import { chatAgent } from './agents/chatAgent.js';
 
 // Create Mastra instance

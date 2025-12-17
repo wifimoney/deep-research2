@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.87",
-    "@hono/node-server": "^1.19.6",
+    "@hono/node-server": "^1.19.7",
     "@mastra/core": "1.0.0-beta.11",
     "@mastra/hono": "0.0.2-beta.6",
     "@mastra/libsql": "1.0.0-beta.7",
@@ -29,7 +29,6 @@
     "drizzle-orm": "^0.45.1",
     "hono": "^4.10.8",
     "in": "^0.19.0",
-    "my-app": "link:my-app",
     "pg": "^8.13.1",
     "postgres": "^3.4.7",
     "uuid": "^11.0.3",

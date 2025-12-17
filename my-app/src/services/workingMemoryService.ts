@@ -1,4 +1,4 @@
-import { storage, ensureStorageInitialized } from '../../../src/mastra/config/storage.js'
+import { storage, ensureStorageInitialized } from '../mastra/config/storage.js'
 
 /**
  * Working Memory State

@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import { Hono } from "hono";
-import { serve } from "@hono/node-server";
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import type { HonoBindings, HonoVariables } from "@mastra/hono";
@@ -36,8 +35,12 @@ app.get('/health', (c) => {
 
 const port = serverConfig.mastraPort;
 
-serve({ fetch: app.fetch, port }, () => {
-  console.log(`Mastra server running on http://localhost:${port}`);
-  console.log(`Agent API: http://localhost:${port}/api/agent`);
-  console.log(`Health check: http://localhost:${port}/health`);
+const server = Bun.serve({
+  fetch: app.fetch,
+  port,
+  hostname: '0.0.0.0',
 });
+
+console.log(`Mastra server running on http://localhost:${server.port}`);
+console.log(`Agent API: http://localhost:${server.port}/api/agent`);
+console.log(`Health check: http://localhost:${server.port}/health`);

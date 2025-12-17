@@ -10,10 +10,10 @@
 
 import { chatAgent } from '../agents/chatAgent.js'
 import { dashboardAgent } from '../mastra/agents/dashboardAgent.js'
-import { standardMemory as memory } from '../../../src/mastra/config/memory.js'
-import { storage, ensureStorageInitialized } from '../../../src/mastra/config/storage.js'
+import { standardMemory as memory } from '../mastra/config/memory.js'
+import { storage, ensureStorageInitialized } from '../mastra/config/storage.js'
 import { getWorkingMemorySummary } from './workingMemoryService.js'
-import { apiKeysConfig } from '../../../src/mastra/config/config.js'
+import { apiKeysConfig } from '../mastra/config/config.js'
 
 // Re-export storage for direct access in getThreads
 export { storage }
