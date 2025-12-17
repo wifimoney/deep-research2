@@ -9,6 +9,7 @@
  */
 
 import { chatAgent } from '../agents/chatAgent.js'
+import { dashboardAgent } from '../mastra/agents/dashboardAgent.js'
 import { standardMemory as memory } from '../../../src/mastra/config/memory.js'
 import { storage, ensureStorageInitialized } from '../../../src/mastra/config/storage.js'
 import { getWorkingMemorySummary } from './workingMemoryService.js'
@@ -345,6 +346,116 @@ export async function sendMessage(
     },
     threadId,
     workingMemorySummary,
+  }
+}
+
+
+/**
+ * Send a message to the dashboard agent
+ */
+export async function sendDashboardMessage(
+  userId: string,
+  threadId: string,
+  message: string
+): Promise<AgentResponse> {
+  // Check for required environment variables
+  if (!apiKeysConfig.hasAiKey) {
+    throw new Error('API key not configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY environment variable in your .env file.')
+  }
+
+  // Validate inputs
+  if (!userId) throw new Error('sendDashboardMessage: userId is required')
+  if (!threadId) throw new Error('sendDashboardMessage: threadId is required')
+  if (!message || message.trim().length === 0) throw new Error('sendDashboardMessage: Cannot send empty message')
+
+  // Ensure storage is initialized
+  await ensureStorageInitialized()
+
+  // Ensure thread exists (both in Mastra and Drizzle)
+  await getOrCreateThread(threadId, userId, 'Dashboard Chat')
+
+  const now = new Date()
+  const userMsgId = `msg-${Date.now()}-user`
+
+  // 1. Store USER message in Mastra Memory
+  try {
+    await (memory as any).storage.saveMessages({
+      messages: [{
+        id: userMsgId,
+        threadId,
+        role: 'user',
+        content: message,
+        createdAt: now,
+        type: 'text'
+      }]
+    })
+  } catch (error) {
+    console.error(`[MemoryService] Failed to store user message in Mastra:`, error)
+  }
+
+  // Generate response
+  let responseText = ''
+
+  try {
+    const response = await dashboardAgent.generate(message, {
+      resourceId: userId,
+      threadId: threadId,
+    })
+
+    if (!response || !response.text) {
+      throw new Error('AI agent returned an invalid response')
+    }
+
+    responseText = response.text
+  } catch (error) {
+    console.error(`[MemoryService] Error generating response:`, error)
+    throw new Error(`Failed to generate AI response: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+
+  const assistantMsgId = `msg-${Date.now()}-assistant`
+  const assistantCreatedAt = new Date()
+
+  // 2. Store ASSISTANT message in Mastra Memory
+  try {
+    await (memory as any).storage.saveMessages({
+      messages: [{
+        id: assistantMsgId,
+        threadId,
+        role: 'assistant',
+        content: responseText,
+        createdAt: assistantCreatedAt,
+        type: 'text'
+      }]
+    })
+  } catch (error) {
+    console.error(`[MemoryService] Failed to store assistant message in Mastra:`, error)
+  }
+
+  // Update thread timestamp
+  try {
+    await storage.updateThread({
+      id: threadId,
+      title: 'Dashboard Chat',
+      metadata: {},
+    })
+  } catch (e: any) {
+    console.warn('[MemoryService] Failed to update thread timestamp:', e)
+  }
+
+  return {
+    userMessage: {
+      id: userMsgId,
+      role: 'user',
+      content: message,
+      createdAt: now,
+    },
+    assistantMessage: {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: responseText,
+      createdAt: assistantCreatedAt,
+    },
+    threadId,
   }
 }
 

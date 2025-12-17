@@ -15,11 +15,13 @@ import { users } from '../db/schema.js'
 import { eq } from 'drizzle-orm'
 import {
   sendMessage,
+  sendDashboardMessage,
   getHistory,
   getThreads,
   createThread,
   cleanupEmptyThreads,
 } from '../services/memoryService.js'
+import { googleService } from '../services/googleService.js'
 
 const api = new Hono()
 
@@ -343,5 +345,90 @@ api.post('/chat/cleanup', async (c) => {
     return c.json({ success: false, error: 'Failed to cleanup threads' }, 500)
   }
 })
+
+// ============================================================================
+// Dashboard API Endpoints
+// ============================================================================
+
+// GET /api/dashboard/gmail - List Gmail emails
+api.get('/dashboard/gmail', async (c: any) => {
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) {
+      return c.json({ success: false, error: 'Not authenticated' }, 401)
+    }
+
+    const query = c.req.query('q')
+    const maxResults = Number(c.req.query('maxResults')) || 10
+
+    const messages = await googleService.listGmail(user.id, query, maxResults)
+
+    return c.json({
+      success: true,
+      messages,
+    })
+  } catch (error) {
+    console.error('List Gmail error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to list emails'
+    return c.json({ success: false, error: errorMessage }, 500)
+  }
+})
+
+// GET /api/dashboard/contacts - List Google Contacts
+api.get('/dashboard/contacts', async (c: any) => {
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) {
+      return c.json({ success: false, error: 'Not authenticated' }, 401)
+    }
+
+    const maxResults = Number(c.req.query('maxResults')) || 20
+
+    const contacts = await googleService.listContacts(user.id, maxResults)
+
+    return c.json({
+      success: true,
+      contacts,
+    })
+  } catch (error) {
+    console.error('List Contacts error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to list contacts'
+    return c.json({ success: false, error: errorMessage }, 500)
+  }
+})
+
+// POST /api/dashboard/query - Natural language query about dashboard data
+api.post('/dashboard/query', async (c: any) => {
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) {
+      return c.json({ success: false, error: 'Not authenticated' }, 401)
+    }
+
+    const { message, threadId } = await c.req.json()
+
+    if (!message) {
+      return c.json({ success: false, error: 'message is required' }, 400)
+    }
+
+    // Use provided threadId or create a new one
+    // Note: We use a distinct prefix 'dash-' but it's just a string convention
+    const activeThreadId = threadId || `dash-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+
+    const result = await sendDashboardMessage(user.id, activeThreadId, message)
+
+    return c.json({
+      success: true,
+      userMessage: result.userMessage,
+      assistantMessage: result.assistantMessage,
+      threadId: result.threadId,
+    })
+  } catch (error) {
+    console.error('Dashboard query error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process query'
+    return c.json({ success: false, error: errorMessage }, 500)
+  }
+})
+
 
 export default api

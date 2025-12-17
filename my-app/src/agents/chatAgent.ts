@@ -3,6 +3,7 @@ import { standardMemory as memory } from '../../../src/mastra/config/memory.js';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 import { openai } from '@ai-sdk/openai';
 import { apiKeysConfig } from '../../../src/mastra/config/config.js';
+import { listGmail, listContacts } from '../tools/google-tools.js';
 
 /**
  * Chat Agent with Memory and Semantic Recall
@@ -23,6 +24,7 @@ import { apiKeysConfig } from '../../../src/mastra/config/config.js';
  */
 export const chatAgent = new Agent({
   name: 'chatAgent',
+  id: 'chat-agent',
   instructions: `You are a helpful AI assistant with advanced memory capabilities.
 
 ## Memory Capabilities
@@ -62,12 +64,12 @@ The system handles finding the relevant past messages automatically - you just r
     console.log('[ChatAgent] Initializing model provider...');
     console.log('[ChatAgent] OpenRouter key available:', !!apiKeysConfig.openrouter);
     console.log('[ChatAgent] OpenAI key available:', !!apiKeysConfig.openai);
-    
+
     if (apiKeysConfig.openrouter) {
       console.log('[ChatAgent] ✅ Using OpenRouter provider');
-      return openrouter('openai/gpt-4o-mini', {
-        apiKey: apiKeysConfig.openrouter,
-      });
+      // Assuming env var OPENROUTER_API_KEY is set, or we need to configure the provider elsewhere.
+      // The default export 'openrouter' usually reads from env.
+      return openrouter('openai/gpt-4o-mini');
     } else if (apiKeysConfig.openai) {
       console.log('[ChatAgent] ✅ Using OpenAI provider');
       const openaiKey = apiKeysConfig.openai;
@@ -75,13 +77,16 @@ The system handles finding the relevant past messages automatically - you just r
       if (!openaiKey.startsWith('sk-')) {
         console.warn('[ChatAgent] ⚠️  Warning: OpenAI API key does not start with "sk-"');
       }
-      return openai('gpt-4o-mini', {
-        apiKey: openaiKey,
-      });
+      // OpenAI provider reads OPENAI_API_KEY from process.env by default
+      return openai('gpt-4o-mini');
     } else {
       console.error('[ChatAgent] ❌ No API key configured');
       throw new Error('No API key configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.');
     }
   })(),
-  memory: memory,
+  memory: memory as any,
+  tools: {
+    listGmail,
+    listContacts
+  }
 });

@@ -110,3 +110,21 @@ export const memoryMessages = pgTable("mastra_messages", {
   createdAt: timestamp("createdAtZ", { withTimezone: true, mode: "date" }), // Mastra uses createdAtZ for timezone-aware
   // Note: Mastra's table also has: type, embedding, metadata columns, but we don't need them for our queries
 });
+
+export const userDashboardPreferences = pgTable("user_dashboard_preferences", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  refreshInterval: text("refresh_interval").default("5m"),
+  favoriteContacts: text("favorite_contacts"), // JSON string of contact IDs
+  emailFilters: text("email_filters"), // JSON string of filter queries
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull().defaultNow(),
+});
