@@ -25,6 +25,17 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Request Gmail and Contacts API scopes
+      scope: [
+        'openid',
+        'profile',
+        'email',
+        'https://www.googleapis.com/auth/gmail.readonly',           // ✅ Add this
+        'https://www.googleapis.com/auth/contacts.readonly'         // ✅ Add this
+      ],
+      // Ensure we get refresh tokens
+      accessType: 'offline',
+      prompt: 'consent',
     },
   },
   cookies: {
