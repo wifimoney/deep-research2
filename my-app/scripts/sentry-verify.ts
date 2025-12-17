@@ -1,11 +1,13 @@
 import "../src/instrument.ts";
 import * as Sentry from "@sentry/node";
 
+function foo() {
+  throw new Error("Test error for Sentry verification");
+}
+
 async function main() {
   try {
     // Intentional error for Sentry verification
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     foo();
   } catch (error) {
     const eventId = Sentry.captureException(error);
