@@ -202,16 +202,19 @@ function extractTextContent(msg: any): string {
  * 2. Performs semantic recall to find relevant past messages
  * 3. Saves both user and assistant messages with embeddings
  * 
+
  * @param userId - The authenticated user's ID (used as resourceId for memory isolation)
  * @param threadId - The conversation thread ID
  * @param message - The user's message
  * @param includeWorkingMemory - Whether to include working memory context (default: false)
+ * @param googleTokens - Optional Google OAuth tokens to pass to tools
  */
 export async function sendMessage(
   userId: string,
   threadId: string,
   message: string,
-  includeWorkingMemory = false
+  includeWorkingMemory = false,
+  googleTokens?: any
 ): Promise<AgentResponse> {
   // Check for required environment variables
   if (!apiKeysConfig.hasAiKey) {
@@ -224,6 +227,9 @@ export async function sendMessage(
   if (!message || message.trim().length === 0) throw new Error('sendMessage: Cannot send empty message')
 
   console.log(`[MemoryService] sendMessage called for thread ${threadId}, user ${userId}`)
+  if (googleTokens) {
+    console.log(`[MemoryService] Including Google tokens in context`)
+  }
 
   // Ensure storage is initialized
   try {
@@ -288,7 +294,8 @@ export async function sendMessage(
     const response = await chatAgent.generateLegacy(enhancedMessage, {
       resourceId: userId,
       threadId: threadId,
-    })
+      googleTokens,
+    } as any)
 
     if (!response || !response.text) {
       throw new Error('AI agent returned an invalid response')

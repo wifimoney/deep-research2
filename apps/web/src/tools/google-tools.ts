@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { googleService } from '../services/googleService.js';
+import { googleService, getValidTokenFromAccount } from '../services/googleService.js';
 
 export const listGmail = createTool({
     id: 'list_gmail',
@@ -13,16 +13,28 @@ export const listGmail = createTool({
         try {
             // Mastra passes the resourceId as executionContext.resourceId if provided in generate()
             const userId = (executionContext as any)?.resourceId;
+            const googleTokens = (executionContext as any)?.googleTokens;
+
             if (!userId) {
+                console.error('[Tool: list_gmail] Missing userId in context');
                 return { error: 'User ID is missing from tool context' };
             }
 
+            if (!googleTokens) {
+                console.error('[Tool: list_gmail] Missing googleTokens in context');
+                return { error: 'Google authentication tokens missing from context' };
+            }
+
+            // Get valid access token (refreshes if needed)
+            const accessToken = await getValidTokenFromAccount(googleTokens);
+
             const { query, maxResults } = data;
-            const messages = await googleService.listGmail(userId, query, maxResults);
+            const messages = await googleService.listGmail(userId, query, maxResults, accessToken);
 
             return { messages };
 
         } catch (error: any) {
+            console.error('[Tool: list_gmail] Error:', error);
             return { error: error.message };
         }
     }
@@ -37,16 +49,28 @@ export const listContacts = createTool({
     execute: async (data, executionContext) => {
         try {
             const userId = (executionContext as any)?.resourceId;
+            const googleTokens = (executionContext as any)?.googleTokens;
+
             if (!userId) {
+                console.error('[Tool: list_contacts] Missing userId in context');
                 return { error: 'User ID is missing from tool context' };
             }
 
+            if (!googleTokens) {
+                console.error('[Tool: list_contacts] Missing googleTokens in context');
+                return { error: 'Google authentication tokens missing from context' };
+            }
+
+            // Get valid access token (refreshes if needed)
+            const accessToken = await getValidTokenFromAccount(googleTokens);
+
             const { maxResults } = data;
-            const contacts = await googleService.listContacts(userId, maxResults);
+            const contacts = await googleService.listContacts(userId, maxResults, accessToken);
 
             return { contacts };
 
         } catch (error: any) {
+            console.error('[Tool: list_contacts] Error:', error);
             return { error: error.message };
         }
     }

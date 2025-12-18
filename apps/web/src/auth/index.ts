@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import * as Sentry from "@sentry/node";
 import { db, users, sessions, oauthAccounts, verification } from "@repo/db";
 import { serverConfig } from "../mastra/config/config.js";
 
@@ -64,19 +65,16 @@ export const auth = betterAuth({
     secure: process.env.NODE_ENV === "production",
   },
   // Add error handling configuration
-  onError: (error, context) => {
+  onError: (error: any, context: any) => {
     console.error('Better Auth error:', error)
     console.error('Context:', context)
-    
-    // Log to Sentry if available
-    if (typeof Sentry !== 'undefined') {
-      const Sentry = require('@sentry/node')
-      Sentry.captureException(error, {
-        extra: {
-          context: context?.path || 'unknown',
-        }
-      })
-    }
+
+    // Log to Sentry
+    Sentry.captureException(error, {
+      extra: {
+        context: context?.path || 'unknown',
+      }
+    })
   },
   // Configure callback URL explicitly
   redirects: {

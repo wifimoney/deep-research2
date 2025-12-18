@@ -1,29 +1,14 @@
 
 import { db, oauthAccounts } from '@repo/db';
-
 import { eq, and } from 'drizzle-orm';
 
 /**
- * Helper to get Google Access Token for a user
+ * Helper to ensure we have a valid access token from an account record
+ * Refreshes if expired
  */
-async function getGoogleToken(userId: string) {
-    if (!userId) {
-        throw new Error('User ID is missing');
-    }
-
-    const account = await db.query.oauthAccounts.findFirst({
-        where: and(
-            eq(oauthAccounts.userId, userId),
-            eq(oauthAccounts.providerId, 'google')
-        ),
-    });
-
-    if (!account) {
-        throw new Error('NO_GOOGLE_ACCOUNT: No Google account connected. Please sign in with Google to access Gmail and Contacts.');
-    }
-    
+export async function getValidTokenFromAccount(account: typeof oauthAccounts.$inferSelect) {
     if (!account.accessToken) {
-        throw new Error('NO_ACCESS_TOKEN: Google account found but missing access token. Please sign in with Google again.');
+        throw new Error('NO_ACCESS_TOKEN: Google account found but missing access token.');
     }
 
     // Check if token is expired (or close to expiring, e.g., within 5 minutes)
@@ -49,6 +34,8 @@ async function getGoogleToken(userId: string) {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                // If the refresh token is invalid, we can't do anything.
+                // The caller should probable trigger a re-auth flow.
                 console.error('[GoogleService] Failed to refresh token:', errorText);
                 throw new Error(`Failed to refresh Google token: ${errorText}`);
             }
@@ -68,19 +55,40 @@ async function getGoogleToken(userId: string) {
                     ...(data.refresh_token ? { refreshToken: data.refresh_token } : {})
                 })
                 .where(and(
-                    eq(oauthAccounts.userId, userId),
+                    eq(oauthAccounts.userId, account.userId),
                     eq(oauthAccounts.providerId, 'google')
                 ));
 
             return newAccessToken;
         } catch (error) {
             console.error('[GoogleService] Token refresh error:', error);
-            // If refresh fails, we might still try the old token or throw
             throw error;
         }
     }
 
     return account.accessToken;
+}
+
+/**
+ * Helper to get Google Access Token for a user from DB
+ */
+async function getGoogleToken(userId: string) {
+    if (!userId) {
+        throw new Error('User ID is missing');
+    }
+
+    const account = await db.query.oauthAccounts.findFirst({
+        where: and(
+            eq(oauthAccounts.userId, userId),
+            eq(oauthAccounts.providerId, 'google')
+        ),
+    });
+
+    if (!account) {
+        throw new Error('NO_GOOGLE_ACCOUNT: No Google account connected. Please sign in with Google to access Gmail and Contacts.');
+    }
+
+    return getValidTokenFromAccount(account);
 }
 
 export interface GmailMessage {
@@ -102,9 +110,13 @@ export interface GoogleContact {
 export const googleService = {
     /**
      * List recent emails from Gmail
+     * @param userId User ID
+     * @param query Search query
+     * @param maxResults Max results
+     * @param accessToken Optional access token (if provided, skips DB lookup)
      */
-    async listGmail(userId: string, query?: string, maxResults: number = 10): Promise<GmailMessage[]> {
-        const token = await getGoogleToken(userId);
+    async listGmail(userId: string, query?: string, maxResults: number = 10, accessToken?: string): Promise<GmailMessage[]> {
+        const token = accessToken || await getGoogleToken(userId);
 
         const params = new URLSearchParams();
         params.append('maxResults', String(maxResults));
@@ -167,9 +179,12 @@ export const googleService = {
 
     /**
      * List Google Contacts
+     * @param userId User ID
+     * @param maxResults Max results
+     * @param accessToken Optional access token (if provided, skips DB lookup)
      */
-    async listContacts(userId: string, maxResults: number = 20): Promise<GoogleContact[]> {
-        const token = await getGoogleToken(userId);
+    async listContacts(userId: string, maxResults: number = 20, accessToken?: string): Promise<GoogleContact[]> {
+        const token = accessToken || await getGoogleToken(userId);
 
         const params = new URLSearchParams();
         params.append('pageSize', String(maxResults));

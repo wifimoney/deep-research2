@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { getSessionWithUser } from '../services/userService.js'
 import { getSession as getBetterAuthSession } from '../auth/index.js'
-import { db, users } from '@repo/db'
-import { eq } from 'drizzle-orm'
+import { db, users, oauthAccounts } from '@repo/db'
+import { eq, and } from 'drizzle-orm'
 import {
   sendMessage,
   getHistory,
@@ -91,7 +91,27 @@ agent.post('/chat', async (c) => {
       return c.json({ success: false, error: 'threadId and message are required' }, 400)
     }
 
-    const result = await sendMessage(user.id, threadId, message, includeWorkingMemory)
+    // Fetch Google OAuth tokens for the authenticated user
+    const googleTokens = await db.query.oauthAccounts.findFirst({
+      where: and(
+        eq(oauthAccounts.userId, user.id),
+        eq(oauthAccounts.providerId, 'google')
+      )
+    })
+
+    if (!googleTokens) {
+      console.warn(`[Agent] No Google tokens found for user ${user.id}`)
+    } else {
+      console.log(`[Agent] Found Google tokens for user ${user.id}`)
+    }
+
+    const result = await sendMessage(
+      user.id,
+      threadId,
+      message,
+      includeWorkingMemory,
+      googleTokens
+    )
 
     return c.json({
       success: true,
