@@ -361,11 +361,16 @@ export async function sendMessage(
 
 /**
  * Send a message to the dashboard agent
+ * @param userId - The authenticated user's ID
+ * @param threadId - The conversation thread ID
+ * @param message - The user's message
+ * @param googleTokens - Optional Google tokens to pass to tools
  */
 export async function sendDashboardMessage(
   userId: string,
   threadId: string,
-  message: string
+  message: string,
+  googleTokens?: any
 ): Promise<AgentResponse> {
   // Check for required environment variables
   if (!apiKeysConfig.hasAiKey) {
@@ -410,7 +415,8 @@ export async function sendDashboardMessage(
     const response = await dashboardAgent.generate(message, {
       resourceId: userId,
       threadId: threadId,
-    })
+      googleTokens,
+    } as any)
 
     if (!response || !response.text) {
       throw new Error('AI agent returned an invalid response')

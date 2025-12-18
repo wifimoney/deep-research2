@@ -4,7 +4,74 @@ import { oauthAccounts } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 /**
- * Helper to get Google Access Token for a user
+ * Helper to ensure we have a valid access token from an account record
+ * Refreshes if expired
+ */
+export async function getValidTokenFromAccount(account: typeof oauthAccounts.$inferSelect) {
+    if (!account.accessToken) {
+        throw new Error('NO_ACCESS_TOKEN: Google account found but missing access token.');
+    }
+
+    // Check if token is expired (or close to expiring, e.g., within 5 minutes)
+    const now = new Date();
+    const expiry = account.accessTokenExpiresAt;
+    const isExpired = expiry && (expiry.getTime() - now.getTime() < 5 * 60 * 1000);
+
+    if (isExpired && account.refreshToken) {
+        console.log('[GoogleService] Access token expired, refreshing...');
+        try {
+            const tokenParams = new URLSearchParams({
+                client_id: process.env.GOOGLE_CLIENT_ID!,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+                refresh_token: account.refreshToken,
+                grant_type: 'refresh_token',
+            });
+
+            const response = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: tokenParams.toString(),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                // If the refresh token is invalid, we can't do anything.
+                // The caller should probable trigger a re-auth flow.
+                console.error('[GoogleService] Failed to refresh token:', errorText);
+                throw new Error(`Failed to refresh Google token: ${errorText}`);
+            }
+
+            const data = await response.json();
+            const newAccessToken = data.access_token;
+            // expires_in is in seconds
+            const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
+
+            // Update database
+            await db.update(oauthAccounts)
+                .set({
+                    accessToken: newAccessToken,
+                    accessTokenExpiresAt: newExpiresAt,
+                    updatedAt: new Date(),
+                    // Some providers rotate refresh tokens
+                    ...(data.refresh_token ? { refreshToken: data.refresh_token } : {})
+                })
+                .where(and(
+                    eq(oauthAccounts.userId, account.userId),
+                    eq(oauthAccounts.providerId, 'google')
+                ));
+
+            return newAccessToken;
+        } catch (error) {
+            console.error('[GoogleService] Token refresh error:', error);
+            throw error;
+        }
+    }
+
+    return account.accessToken;
+}
+
+/**
+ * Helper to get Google Access Token for a user from DB
  */
 async function getGoogleToken(userId: string) {
     if (!userId) {
@@ -18,11 +85,11 @@ async function getGoogleToken(userId: string) {
         ),
     });
 
-    if (!account || !account.accessToken) {
-        throw new Error('No Google account connected or missing access token. Please connect your Google account in settings.');
+    if (!account) {
+        throw new Error('No Google account connected. Please connect your Google account in settings.');
     }
 
-    return account.accessToken;
+    return getValidTokenFromAccount(account);
 }
 
 export interface GmailMessage {
@@ -44,9 +111,13 @@ export interface GoogleContact {
 export const googleService = {
     /**
      * List recent emails from Gmail
+     * @param userId User ID
+     * @param query Search query
+     * @param maxResults Max results
+     * @param accessToken Optional access token (if provided, skips DB lookup)
      */
-    async listGmail(userId: string, query?: string, maxResults: number = 10): Promise<GmailMessage[]> {
-        const token = await getGoogleToken(userId);
+    async listGmail(userId: string, query?: string, maxResults: number = 10, accessToken?: string): Promise<GmailMessage[]> {
+        const token = accessToken || await getGoogleToken(userId);
 
         const params = new URLSearchParams();
         params.append('maxResults', String(maxResults));
@@ -109,9 +180,12 @@ export const googleService = {
 
     /**
      * List Google Contacts
+     * @param userId User ID
+     * @param maxResults Max results
+     * @param accessToken Optional access token (if provided, skips DB lookup)
      */
-    async listContacts(userId: string, maxResults: number = 20): Promise<GoogleContact[]> {
-        const token = await getGoogleToken(userId);
+    async listContacts(userId: string, maxResults: number = 20, accessToken?: string): Promise<GoogleContact[]> {
+        const token = accessToken || await getGoogleToken(userId);
 
         const params = new URLSearchParams();
         params.append('pageSize', String(maxResults));

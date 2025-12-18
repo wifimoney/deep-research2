@@ -11,8 +11,8 @@ import {
 import { verifyPassword, SESSION_COOKIE_OPTIONS } from '../utils/auth.js'
 import { getSession as getBetterAuthSession, auth as betterAuthInstance } from '../auth/index.js'
 import { db } from '../db/drizzle.js'
-import { users } from '../db/schema.js'
-import { eq } from 'drizzle-orm'
+import { users, oauthAccounts } from '../db/schema.js'
+import { eq, and } from 'drizzle-orm'
 import {
   sendMessage,
   sendDashboardMessage,
@@ -257,7 +257,15 @@ api.post('/chat', async (c) => {
       threadId = `thread-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     }
 
-    const result = await sendMessage(user.id, threadId, message)
+    // Fetch Google OAuth tokens
+    const googleTokens = await db.query.oauthAccounts.findFirst({
+      where: and(
+        eq(oauthAccounts.userId, user.id),
+        eq(oauthAccounts.providerId, 'google')
+      )
+    })
+
+    const result = await sendMessage(user.id, threadId, message, false, googleTokens)
 
     return c.json({
       success: true,
@@ -455,7 +463,26 @@ api.post('/dashboard/query', async (c: any) => {
     // Note: We use a distinct prefix 'dash-' but it's just a string convention
     const activeThreadId = threadId || `dash-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 
-    const result = await sendDashboardMessage(user.id, activeThreadId, message)
+    // Fetch Google OAuth tokens
+    console.log(`[Dashboard] Fetching Google tokens for user ${user.id}...`)
+    const googleTokens = await db.query.oauthAccounts.findFirst({
+      where: and(
+        eq(oauthAccounts.userId, user.id),
+        eq(oauthAccounts.providerId, 'google')
+      )
+    })
+
+    if (googleTokens) {
+      console.log('[Dashboard] ✅ Found Google tokens:', {
+        hasAccessToken: !!googleTokens.accessToken,
+        hasRefreshToken: !!googleTokens.refreshToken,
+        expiresAt: googleTokens.accessTokenExpiresAt
+      })
+    } else {
+      console.warn(`[Dashboard] ❌ No Google tokens found for user ${user.id}`)
+    }
+
+    const result = await sendDashboardMessage(user.id, activeThreadId, message, googleTokens)
 
     return c.json({
       success: true,

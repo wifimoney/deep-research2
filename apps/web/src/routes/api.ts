@@ -11,8 +11,8 @@ import {
 } from '../services/userService.js'
 import { verifyPassword, SESSION_COOKIE_OPTIONS } from '../utils/auth.js'
 import { getSession as getBetterAuthSession } from '../auth/index.js'
-import { db, users } from '@repo/db'
-import { eq } from 'drizzle-orm'
+import { db, users, oauthAccounts } from '@repo/db'
+import { eq, and } from 'drizzle-orm'
 import {
   sendMessage,
   sendDashboardMessage,
@@ -239,7 +239,15 @@ api.post('/chat', async (c: Context) => {
       threadId = `thread-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     }
 
-    const result = await sendMessage(user.id, threadId, message)
+    // Fetch Google OAuth tokens
+    const googleTokens = await db.query.oauthAccounts.findFirst({
+      where: and(
+        eq(oauthAccounts.userId, user.id),
+        eq(oauthAccounts.providerId, 'google')
+      )
+    })
+
+    const result = await sendMessage(user.id, threadId, message, false, googleTokens)
 
     return c.json({
       success: true,
@@ -370,18 +378,18 @@ api.get('/dashboard/gmail', async (c: Context) => {
   } catch (error) {
     console.error('List Gmail error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Failed to list emails'
-    
+
     // Check if the error is about missing Google account
     if (errorMessage.includes('NO_GOOGLE_ACCOUNT') || errorMessage.includes('NO_ACCESS_TOKEN')) {
       // Extract user-friendly message (after the error code prefix)
       const friendlyMessage = errorMessage.split(': ')[1] || errorMessage
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: friendlyMessage,
-        requiresGoogleAuth: true 
+        requiresGoogleAuth: true
       }, 401)
     }
-    
+
     return c.json({ success: false, error: errorMessage }, 500)
   }
 })
@@ -405,18 +413,18 @@ api.get('/dashboard/contacts', async (c: Context) => {
   } catch (error) {
     console.error('List Contacts error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Failed to list contacts'
-    
+
     // Check if the error is about missing Google account
     if (errorMessage.includes('NO_GOOGLE_ACCOUNT') || errorMessage.includes('NO_ACCESS_TOKEN')) {
       // Extract user-friendly message (after the error code prefix)
       const friendlyMessage = errorMessage.split(': ')[1] || errorMessage
-      return c.json({ 
-        success: false, 
+      return c.json({
+        success: false,
         error: friendlyMessage,
-        requiresGoogleAuth: true 
+        requiresGoogleAuth: true
       }, 401)
     }
-    
+
     return c.json({ success: false, error: errorMessage }, 500)
   }
 })
@@ -439,7 +447,15 @@ api.post('/dashboard/query', async (c: Context) => {
     // Note: We use a distinct prefix 'dash-' but it's just a string convention
     const activeThreadId = threadId || `dash-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 
-    const result = await sendDashboardMessage(user.id, activeThreadId, message)
+    // Fetch Google OAuth tokens
+    const googleTokens = await db.query.oauthAccounts.findFirst({
+      where: and(
+        eq(oauthAccounts.userId, user.id),
+        eq(oauthAccounts.providerId, 'google')
+      )
+    })
+
+    const result = await sendDashboardMessage(user.id, activeThreadId, message, googleTokens)
 
     return c.json({
       success: true,

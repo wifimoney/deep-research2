@@ -211,7 +211,8 @@ export async function sendMessage(
   userId: string,
   threadId: string,
   message: string,
-  includeWorkingMemory = false
+  includeWorkingMemory = false,
+  googleTokens?: any
 ): Promise<AgentResponse> {
   // Check for required environment variables
   if (!apiKeysConfig.hasAiKey) {
@@ -288,7 +289,8 @@ export async function sendMessage(
     const response = await chatAgent.generateLegacy(enhancedMessage, {
       resourceId: userId,
       threadId: threadId,
-    })
+      googleTokens,
+    } as any)
 
     if (!response || !response.text) {
       throw new Error('AI agent returned an invalid response')
@@ -358,7 +360,8 @@ export async function sendMessage(
 export async function sendDashboardMessage(
   userId: string,
   threadId: string,
-  message: string
+  message: string,
+  googleTokens?: any
 ): Promise<AgentResponse> {
   // Check for required environment variables
   if (!apiKeysConfig.hasAiKey) {
@@ -400,12 +403,14 @@ export async function sendDashboardMessage(
   let responseText = ''
 
   try {
-    const response = await dashboardAgent.generate(message, {
-      memory: {
-        resource: userId,
-        thread: threadId,
-      },
-    })
+    // Inject userId into prompt to ensure tools receive it
+    const promptWithContext = `${message}\n\n[System Note] Current User ID: ${userId}`;
+
+    const response = await dashboardAgent.generate(promptWithContext, {
+      resourceId: userId,
+      threadId: threadId,
+      googleTokens,
+    } as any)
 
     if (!response || !response.text) {
       throw new Error('AI agent returned an invalid response')
