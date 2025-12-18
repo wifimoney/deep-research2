@@ -401,8 +401,10 @@ export async function sendDashboardMessage(
 
   try {
     const response = await dashboardAgent.generate(message, {
-      resourceId: userId,
-      threadId: threadId,
+      memory: {
+        resource: userId,
+        thread: threadId,
+      },
     })
 
     if (!response || !response.text) {

@@ -35,9 +35,7 @@ async function getAuthenticatedUser(c: any) {
     if (betterAuthSession?.user) {
       const userId = betterAuthSession.session?.userId || betterAuthSession.user?.id
       if (userId) {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, userId),
-        })
+        const user = await db.select().from(users).where(eq(users.id, userId)).then(results => results[0])
         if (user) {
           // Use name from Better Auth if available, then database name, then username, then derive from email
           const username = betterAuthSession.user.name || user.name || user.username || user.email?.split('@')[0] || 'User'
