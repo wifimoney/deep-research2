@@ -1,11 +1,11 @@
 import 'dotenv/config';
-import { db } from '../src/db/drizzle.js';
+import { db } from '../src/shared/db/drizzle.js';
 import { sql } from 'drizzle-orm';
 
 async function checkConstraints() {
   try {
     console.log('Checking database constraints...');
-    
+
     // Check users table structure
     const usersInfo = await db.execute(sql`
       SELECT column_name, data_type, is_nullable, column_default
@@ -14,8 +14,8 @@ async function checkConstraints() {
       ORDER BY ordinal_position;
     `);
     console.log('\nUsers table columns:');
-    console.table(usersInfo.rows);
-    
+    console.table(usersInfo);
+
     // Check oauth_accounts table structure
     const accountsInfo = await db.execute(sql`
       SELECT column_name, data_type, is_nullable, column_default
@@ -24,8 +24,8 @@ async function checkConstraints() {
       ORDER BY ordinal_position;
     `);
     console.log('\nOAuth accounts table columns:');
-    console.table(accountsInfo.rows);
-    
+    console.table(accountsInfo);
+
     // Check for any NOT NULL constraints that might cause issues
     const constraints = await db.execute(sql`
       SELECT 
@@ -41,8 +41,8 @@ async function checkConstraints() {
       ORDER BY tc.table_name, kcu.column_name;
     `);
     console.log('\nNOT NULL constraints:');
-    console.table(constraints.rows);
-    
+    console.table(constraints);
+
     process.exit(0);
   } catch (error) {
     console.error('❌ Error checking constraints:', error);

@@ -11,7 +11,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "sentry:verify": "tsx scripts/sentry-verify.ts"
+    "sentry:verify": "tsx scripts/sentry-verify.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.87",

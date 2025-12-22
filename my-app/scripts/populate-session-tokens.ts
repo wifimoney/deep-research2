@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { db } from '../src/db/drizzle.js';
+import { db } from '../src/shared/db/drizzle.js';
 import { sql } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 
