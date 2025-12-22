@@ -119,13 +119,8 @@ export async function deleteThread(
     threadId: string
 ): Promise<void> {
     await ensureStorageInitialized()
-
     // Delete the thread from storage
     await storage.deleteThread({ threadId })
-
-    // Also clear working memory for this thread
-    const { clearWorkingMemory } = await import('../../memory/core/working-memory.js')
-    await clearWorkingMemory(userId, threadId)
 }
 
 /**
